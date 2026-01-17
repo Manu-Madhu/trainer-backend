@@ -35,6 +35,7 @@ const progressRoutes = require('./modules/progress/progress.routes');
 const chatRoutes = require('./modules/chat/chat.routes');
 const subscriptionRoutes = require('./modules/subscription/subscription.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
+const uploadRoutes = require('./modules/upload/upload.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -45,6 +46,7 @@ app.use('/api/progress', progressRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/upload', uploadRoutes);
 
 const PORT = process.env.PORT || 5000;
 
