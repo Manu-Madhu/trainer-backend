@@ -24,4 +24,16 @@ const registerUser = async (req, res) => {
     }
 };
 
-module.exports = { getUsers, registerUser };
+// @desc    Toggle user block status
+// @route   PATCH /api/users/:id/block
+// @access  Admin
+const toggleBlockStatus = async (req, res) => {
+    try {
+        const user = await userService.toggleUserBlockStatus(req.params.id);
+        res.json(user);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+module.exports = { getUsers, registerUser, toggleBlockStatus };

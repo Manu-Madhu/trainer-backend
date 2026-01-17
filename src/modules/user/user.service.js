@@ -40,7 +40,16 @@ const registerUser = async (userData) => {
     return await userRepository.createUser(userData);
 };
 
+const toggleUserBlockStatus = async (userId) => {
+    const user = await userRepository.findUserById(userId);
+    if (!user) {
+        throw new Error('User not found');
+    }
+    return await userRepository.updateUser(userId, { isBlocked: !user.isBlocked });
+};
+
 module.exports = {
     getAllUsers,
     registerUser,
+    toggleUserBlockStatus
 };

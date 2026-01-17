@@ -64,6 +64,10 @@ const login = async (email, password) => {
         throw new Error('Account not verified. Please verify your email/OTP');
     }
 
+    if (user.isBlocked) {
+        throw new Error('Account is blocked. Please contact support.');
+    }
+
     if (await bcrypt.compare(password, user.password)) {
         return {
             _id: user._id,
