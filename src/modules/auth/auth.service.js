@@ -12,7 +12,7 @@ const generateToken = (id) => {
 };
 
 const register = async (userData) => {
-    const { name, email, password, role, phone } = userData;
+    const { name, email, password, role, phone, height, currentWeight, targetWeight, bmi, gender, age, fitnessGoal, activityLevel, medicalConditions } = userData;
 
     const userExists = await User.findOne({ email });
 
@@ -33,6 +33,15 @@ const register = async (userData) => {
         password: hashedPassword,
         phone,
         role: role || 'user',
+        height,
+        currentWeight,
+        targetWeight,
+        bmi,
+        gender,
+        age,
+        fitnessGoal,
+        activityLevel,
+        medicalConditions,
         otp,
         otpExpires,
         isVerified: false // Explicitly set false
