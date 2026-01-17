@@ -12,12 +12,22 @@ const getUsers = async (req, res) => {
     }
 };
 
+const uploadFileToS3 = require('../../utils/s3Upload');
+
+// ... (getUsers remains same)
+
 // @desc    Register a new user
 // @route   POST /api/users
 // @access  Public
 const registerUser = async (req, res) => {
     try {
-        const user = await userService.registerUser(req.body);
+        let avatarUrl = null;
+        if (req.file) {
+            avatarUrl = await uploadFileToS3(req.file);
+        }
+
+        const userData = { ...req.body, avatar: avatarUrl };
+        const user = await userService.registerUser(userData);
         res.status(201).json(user);
     } catch (error) {
         res.status(400).json({ message: error.message });

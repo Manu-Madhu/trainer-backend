@@ -15,7 +15,13 @@ const getAllUsers = async (query = {}) => {
             { email: { $regex: query.search, $options: 'i' } }
         ];
     }
-    if (query.date) {
+    if (query.startDate && query.endDate) {
+        const start = new Date(query.startDate);
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(query.endDate);
+        end.setHours(23, 59, 59, 999);
+        filter.createdAt = { $gte: start, $lte: end };
+    } else if (query.date) {
         // Assuming date comes as YYYY-MM-DD
         const startOfDay = new Date(query.date);
         startOfDay.setHours(0, 0, 0, 0);
