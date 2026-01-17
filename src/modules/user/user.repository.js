@@ -1,7 +1,13 @@
 const User = require('./user.model');
 
-const findAllUsers = async (filter = {}) => {
-    return await User.find(filter).sort({ createdAt: -1 });
+const findAllUsers = async (filter = {}, options = {}) => {
+    const { skip = 0, limit = 10 } = options;
+    const users = await User.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit);
+    const total = await User.countDocuments(filter);
+    return { users, total };
 };
 
 const createUser = async (userData) => {

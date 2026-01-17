@@ -2,6 +2,10 @@ const userRepository = require('./user.repository');
 
 const getAllUsers = async (query = {}) => {
     const filter = {};
+    const page = parseInt(query.page) || 1;
+    const limit = parseInt(query.limit) || 10;
+    const skip = (page - 1) * limit;
+
     if (query.role) {
         filter.role = query.role;
     }
@@ -11,7 +15,18 @@ const getAllUsers = async (query = {}) => {
             { email: { $regex: query.search, $options: 'i' } }
         ];
     }
-    return await userRepository.findAllUsers(filter);
+    if (query.date) {
+        // Assuming date comes as YYYY-MM-DD
+        const startOfDay = new Date(query.date);
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const endOfDay = new Date(query.date);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        filter.createdAt = { $gte: startOfDay, $lte: endOfDay };
+    }
+
+    return await userRepository.findAllUsers(filter, { skip, limit });
 };
 
 const registerUser = async (userData) => {
