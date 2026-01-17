@@ -11,6 +11,17 @@ const getUsers = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+const getUserById = async (req, res) => {
+    try {
+        const user = await userService.getUserById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
 
 const uploadFileToS3 = require('../../utils/s3Upload');
 
@@ -77,4 +88,4 @@ const updateUser = async (req, res) => {
     }
 };
 
-module.exports = { getUsers, registerUser, toggleBlockStatus, deleteUser, updateUser };
+module.exports = { getUsers, getUserById, registerUser, toggleBlockStatus, deleteUser, updateUser };

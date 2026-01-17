@@ -38,6 +38,10 @@ const getAllUsers = async (query = {}) => {
     return await userRepository.findAllUsers(filter, { skip, limit });
 };
 
+const getUserById = async (userId) => {
+    return await userRepository.findUserById(userId);
+};
+
 const registerUser = async (userData) => {
     // Check if user exists
     const userExists = await userRepository.findUserByEmail(userData.email);
@@ -103,6 +107,7 @@ const updateUser = async (userId, updateData) => {
 
 module.exports = {
     getAllUsers,
+    getUserById,
     registerUser,
     toggleUserBlockStatus,
     deleteUser,
