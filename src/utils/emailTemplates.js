@@ -5,7 +5,7 @@ const getEmailLayout = (content) => {
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GymPro Email</title>
+    <title>Trainer Email</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f4f4f5; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
     <div style="width: 100%; background-color: #f4f4f5; padding: 40px 0;">
@@ -13,7 +13,7 @@ const getEmailLayout = (content) => {
             
             <!-- Header -->
             <div style="background-color: #18181b; padding: 32px 0; text-align: center;">
-                <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 2px;">GYMPRO</h1>
+                <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: 2px;">Trainer</h1>
             </div>
 
             <!-- Content -->
@@ -24,10 +24,11 @@ const getEmailLayout = (content) => {
             <!-- Footer -->
             <div style="background-color: #f9fafb; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb;">
                 <p style="margin: 0; color: #6b7280; font-size: 12px;">
-                    &copy; ${new Date().getFullYear()} GymPro Fitness App. All rights reserved.
+                    &copy; ${new Date().getFullYear()} Trainer Fitness App. All rights reserved.
                 </p>
                 <div style="margin-top: 12px; font-size: 12px; color: #9ca3af;">
-                    <p style="margin: 4px 0;">123 Fitness Street, Healthy City</p>
+                    <p style="margin: 4px 0;">Neyyattinkara, Kerala</p>
+                    <p style="margin: 4px 0;">Developed by <a href="https://www.linkedin.com/in/manu-m-madhu/">Manu M</a></p>
                 </div>
             </div>
         </div>
@@ -41,7 +42,7 @@ const getOtpEmailTemplate = (otp) => {
     const content = `
         <h2 style="color: #111827; margin-top: 0; margin-bottom: 16px; font-size: 20px; font-weight: 600;">Verify Your Email Address</h2>
         <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
-            Thank you for joining GymPro! To complete your registration and verify your email address, please use the One-Time Password (OTP) below.
+            Thank you for joining Trainer! To complete your registration and verify your email address, please use the One-Time Password (OTP) below.
         </p>
         
         <div style="background-color: #f3f4f6; border-radius: 8px; padding: 24px; text-align: center; margin-bottom: 24px; border: 1px solid #e5e7eb;">
@@ -82,10 +83,7 @@ const getWelcomeEmailTemplate = (name, email, password) => {
         <p style="color: #4b5563; font-size: 15px; line-height: 1.6; margin-top: 0;">
             For your security, please log in and change your password immediately.
         </p>
-        
-        <div style="text-align: center; margin-top: 32px;">
-            <a href="#" style="background-color: #2563eb; color: #ffffff; padding: 12px 32px; border-radius: 6px; text-decoration: none; font-weight: 600; font-size: 16px; display: inline-block;">Login to Dashboard</a>
-        </div>
+
     `;
     return getEmailLayout(content);
 };

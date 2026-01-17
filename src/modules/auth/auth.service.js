@@ -88,6 +88,7 @@ const login = async (email, password) => {
             email: user.email,
             role: user.role,
             avatar: user.avatar,
+            subscription: user.subscription,
             token: generateToken(user._id),
         };
     } else {

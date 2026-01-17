@@ -76,7 +76,8 @@ const getMe = async (req, res) => {
             name: req.user.name,
             email: req.user.email,
             role: req.user.role,
-            avatar: req.user.avatar
+            avatar: req.user.avatar,
+            subscription: req.user.subscription
         };
         res.json(user);
     } catch (error) {
