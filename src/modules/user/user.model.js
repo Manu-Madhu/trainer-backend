@@ -46,6 +46,16 @@ const userSchema = mongoose.Schema(
         age: {
             type: Number,
         },
+        fitnessGoal: {
+            type: String, // 'lose_weight', 'build_muscle', etc.
+        },
+        activityLevel: {
+            type: String, // 'sedentary', 'active', etc.
+        },
+        medicalConditions: {
+            type: [String],
+            default: []
+        },
 
         // Subscription
         subscription: {
