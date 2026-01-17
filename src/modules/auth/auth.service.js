@@ -12,7 +12,8 @@ const generateToken = (id) => {
 };
 
 const register = async (userData) => {
-    const { name, email, password, role, phone, height, currentWeight, targetWeight, bmi, gender, age, fitnessGoal, activityLevel, medicalConditions } = userData;
+    // Destructure all possible fields, including mapped ones
+    const { name, email, password, role, phone, height, weight, currentWeight, targetWeight, bmi, gender, age, goal, fitnessGoal, activityLevel, workoutType, medicalConditions, injuries } = userData;
 
     const userExists = await User.findOne({ email });
 
@@ -27,21 +28,37 @@ const register = async (userData) => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpires = Date.now() + 10 * 60 * 1000; // 10 mins
 
+    // Normalize Data
+    const normalizedGender = gender ? gender.toLowerCase() : undefined;
+    const finalCurrentWeight = currentWeight || weight;
+    const finalFitnessGoal = fitnessGoal || goal;
+    let finalInjuries = medicalConditions || injuries;
+
+    // Parse injuries if it's a stringified JSON array
+    if (typeof finalInjuries === 'string') {
+        try {
+            finalInjuries = JSON.parse(finalInjuries);
+        } catch (e) {
+            // If parse fails, wrap in array if it's a single string, or empty array
+            finalInjuries = [finalInjuries];
+        }
+    }
+
     const user = await User.create({
         name,
         email,
         password: hashedPassword,
         phone,
         role: role || 'user',
-        height,
-        currentWeight,
-        targetWeight,
-        bmi,
-        gender,
-        age,
-        fitnessGoal,
-        activityLevel,
-        medicalConditions,
+        height: height ? Number(height) : undefined,
+        currentWeight: finalCurrentWeight ? Number(finalCurrentWeight) : undefined,
+        targetWeight: targetWeight ? Number(targetWeight) : undefined,
+        bmi: bmi ? Number(bmi) : undefined,
+        gender: normalizedGender,
+        age: age ? Number(age) : undefined,
+        fitnessGoal: finalFitnessGoal,
+        activityLevel: activityLevel || workoutType, // fallback mapping
+        medicalConditions: finalInjuries,
         otp,
         otpExpires,
         isVerified: false // Explicitly set false
