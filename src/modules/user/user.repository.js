@@ -27,10 +27,15 @@ const updateUser = async (id, updateData) => {
     return await User.findByIdAndUpdate(id, updateData, { new: true });
 };
 
+const deleteUser = async (id) => {
+    return await User.findByIdAndDelete(id);
+};
+
 module.exports = {
     findAllUsers,
     createUser,
     findUserByEmail,
     findUserById,
-    updateUser
+    updateUser,
+    deleteUser
 };

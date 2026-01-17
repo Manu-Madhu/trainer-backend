@@ -54,8 +54,17 @@ const toggleUserBlockStatus = async (userId) => {
     return await userRepository.updateUser(userId, { isBlocked: !user.isBlocked });
 };
 
+const deleteUser = async (userId) => {
+    const user = await userRepository.findUserById(userId);
+    if (!user) {
+        throw new Error('User not found');
+    }
+    return await userRepository.deleteUser(userId);
+};
+
 module.exports = {
     getAllUsers,
     registerUser,
-    toggleUserBlockStatus
+    toggleUserBlockStatus,
+    deleteUser
 };

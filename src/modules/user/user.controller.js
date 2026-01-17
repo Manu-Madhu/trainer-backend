@@ -46,4 +46,16 @@ const toggleBlockStatus = async (req, res) => {
     }
 };
 
-module.exports = { getUsers, registerUser, toggleBlockStatus };
+// @desc    Delete user
+// @route   DELETE /api/users/:id
+// @access  Admin
+const deleteUser = async (req, res) => {
+    try {
+        await userService.deleteUser(req.params.id);
+        res.json({ message: 'User removed' });
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+module.exports = { getUsers, registerUser, toggleBlockStatus, deleteUser };
