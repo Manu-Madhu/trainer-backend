@@ -1,7 +1,7 @@
 const User = require('./user.model');
 
-const findAllUsers = async () => {
-    return await User.find({});
+const findAllUsers = async (filter = {}) => {
+    return await User.find(filter).sort({ createdAt: -1 });
 };
 
 const createUser = async (userData) => {

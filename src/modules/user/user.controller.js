@@ -5,7 +5,7 @@ const userService = require('./user.service');
 // @access  Public
 const getUsers = async (req, res) => {
     try {
-        const users = await userService.getAllUsers();
+        const users = await userService.getAllUsers(req.query);
         res.json(users);
     } catch (error) {
         res.status(500).json({ message: error.message });

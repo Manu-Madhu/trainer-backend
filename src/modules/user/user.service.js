@@ -1,7 +1,17 @@
 const userRepository = require('./user.repository');
 
-const getAllUsers = async () => {
-    return await userRepository.findAllUsers();
+const getAllUsers = async (query = {}) => {
+    const filter = {};
+    if (query.role) {
+        filter.role = query.role;
+    }
+    if (query.search) {
+        filter.$or = [
+            { name: { $regex: query.search, $options: 'i' } },
+            { email: { $regex: query.search, $options: 'i' } }
+        ];
+    }
+    return await userRepository.findAllUsers(filter);
 };
 
 const registerUser = async (userData) => {
