@@ -1,6 +1,8 @@
 const User = require('../user/user.model');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const sendEmail = require('../../utils/sendEmail');
+const { getOtpEmailTemplate } = require('../../utils/emailTemplates');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -37,17 +39,28 @@ const register = async (userData) => {
     });
 
     if (user) {
-        // In real app, send OTP via email service here
-        console.log(`OTP for ${email}: ${otp}`);
+        try {
+            const message = getOtpEmailTemplate(otp);
 
-        return {
-            _id: user._id,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            message: 'Registration successful. OTP sent to email.',
-            isVerified: false
-        };
+            await sendEmail({
+                email: user.email,
+                subject: 'GymPro - Verify Your Email',
+                message
+            });
+
+            return {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                message: 'Registration successful. OTP sent to email.',
+                isVerified: false
+            };
+        } catch (error) {
+            // Rollback user creation if email fails
+            await user.deleteOne();
+            throw new Error('Email could not be sent. Registration failed. Please try again.');
+        }
     } else {
         throw new Error('Invalid user data');
     }

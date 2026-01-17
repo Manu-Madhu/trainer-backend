@@ -1,5 +1,7 @@
 const userRepository = require('./user.repository');
 const bcrypt = require('bcryptjs');
+const sendEmail = require('../../utils/sendEmail');
+const { getWelcomeEmailTemplate } = require('../../utils/emailTemplates');
 
 const getAllUsers = async (query = {}) => {
     const filter = {};
@@ -56,7 +58,23 @@ const registerUser = async (userData) => {
         otpExpires: undefined
     };
 
-    return await userRepository.createUser(userToCreate);
+    const user = await userRepository.createUser(userToCreate);
+
+    // Send Welcome Email
+    try {
+        const message = getWelcomeEmailTemplate(user.name, userData.email, userData.password);
+
+        await sendEmail({
+            email: user.email,
+            subject: 'Welcome to GymPro - Account Credentials',
+            message
+        });
+    } catch (error) {
+        console.error('Could not send welcome email', error);
+        // Don't fail the process, just log it. Admin knows the password.
+    }
+
+    return user;
 };
 
 const toggleUserBlockStatus = async (userId) => {
