@@ -7,9 +7,11 @@ const getAdminStats = async (req, res) => {
     try {
         const totalUsers = await User.countDocuments({ role: 'user' });
         const totalTrainers = await User.countDocuments({ role: 'trainer' });
+        const totalPremiumUsers = await User.countDocuments({ 'subscription.plan': 'premium' });
 
-        // Mocking revenue for now as Subscription model might be basic
-        const revenue = 12500;
+        // Calculate revenue based on active premium subscriptions (Assuming ₹999/month)
+        const revenue = totalPremiumUsers * 999;
+
 
         // Get recent users (last 5)
         const recentUsers = await User.find({ role: 'user' })
