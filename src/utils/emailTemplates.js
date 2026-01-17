@@ -27,7 +27,6 @@ const getEmailLayout = (content) => {
                     &copy; ${new Date().getFullYear()} Trainer Fitness App. All rights reserved.
                 </p>
                 <div style="margin-top: 12px; font-size: 12px; color: #9ca3af;">
-                    <p style="margin: 4px 0;">Neyyattinkara, Kerala</p>
                     <p style="margin: 4px 0;">Developed by <a href="https://www.linkedin.com/in/manu-m-madhu/">Manu M</a></p>
                 </div>
             </div>
@@ -58,7 +57,7 @@ const getOtpEmailTemplate = (otp) => {
 
 const getWelcomeEmailTemplate = (name, email, password) => {
     const content = `
-        <h2 style="color: #111827; margin-top: 0; margin-bottom: 16px; font-size: 20px; font-weight: 600;">Welcome to GymPro!</h2>
+        <h2 style="color: #111827; margin-top: 0; margin-bottom: 16px; font-size: 20px; font-weight: 600;">Welcome to Trainer!</h2>
         <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
             Hello <strong>${name}</strong>,<br><br>
             Your account has been successfully created by our administrator. We are excited to have you on board! Below are your temporary login credentials.
