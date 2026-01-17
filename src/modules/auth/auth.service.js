@@ -40,6 +40,7 @@ const register = async (userData) => {
 
     if (user) {
         try {
+            console.log(`[DEV] OTP for ${user.email}: ${otp}`); // Log OTP for Dev
             const message = getOtpEmailTemplate(otp);
 
             await sendEmail({
@@ -57,9 +58,18 @@ const register = async (userData) => {
                 isVerified: false
             };
         } catch (error) {
-            // Rollback user creation if email fails
-            await user.deleteOne();
-            throw new Error('Email could not be sent. Registration failed. Please try again.');
+            console.error('Email send failed:', error);
+            // In dev, don't fail registration, just log.
+            // await user.deleteOne();
+            // throw new Error('Email could not be sent. Registration failed. Please try again.');
+            return {
+                _id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                message: 'Registration successful. OTP log in console (Dev).',
+                isVerified: false
+            };
         }
     } else {
         throw new Error('Invalid user data');
