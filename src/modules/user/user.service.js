@@ -66,7 +66,7 @@ const registerUser = async (userData) => {
 
         await sendEmail({
             email: user.email,
-            subject: 'Welcome to GymPro - Account Credentials',
+            subject: 'Welcome to Trainer - Account Credentials',
             message
         });
     } catch (error) {
