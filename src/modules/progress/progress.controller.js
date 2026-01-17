@@ -45,8 +45,32 @@ const addFeedback = async (req, res) => {
     }
 };
 
+const getBmiLogs = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { from, to } = req.query;
+        const logs = await progressService.getBmiLogs(userId, from, to);
+        res.json(logs);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+const getDailyLogs = async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { from, to } = req.query;
+        const logs = await progressService.getDailyLogs(userId, from, to);
+        res.json(logs);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     logProgress,
     getProgressHistory,
-    addFeedback
+    addFeedback,
+    getBmiLogs,
+    getDailyLogs
 };

@@ -16,8 +16,54 @@ const addFeedback = async (id, feedback) => {
     return await Progress.findByIdAndUpdate(id, { trainerFeedback: feedback }, { new: true });
 };
 
+const DailyLog = require('./dailyLog.model');
+const User = require('../user/user.model');
+
+const getBmiLogs = async (userId, from, to) => {
+    // Build date filter
+    const dateFilter = { user: userId };
+    if (from || to) {
+        dateFilter.date = {};
+        if (from) dateFilter.date.$gte = new Date(from);
+        if (to) dateFilter.date.$lte = new Date(to);
+    }
+
+    const user = await User.findById(userId).select('height');
+    const logs = await Progress.find(dateFilter).sort({ date: -1 });
+
+    if (!user || !user.height) return logs; // user might not have height
+
+    const heightInMeters = user.height / 100;
+    return logs.map(log => {
+        let bmi = null;
+        if (log.weight) {
+            bmi = log.weight / (heightInMeters * heightInMeters);
+        }
+        return {
+            _id: log._id,
+            date: log.date,
+            weight: log.weight,
+            bmi: bmi ? parseFloat(bmi.toFixed(1)) : null,
+            createdAt: log.createdAt
+        };
+    });
+};
+
+const getDailyLogs = async (userId, from, to) => {
+    const dateFilter = { user: userId };
+    if (from || to) {
+        dateFilter.date = {};
+        if (from) dateFilter.date.$gte = new Date(from);
+        if (to) dateFilter.date.$lte = new Date(to);
+    }
+    return await DailyLog.find(dateFilter).sort({ date: -1 });
+};
+
 module.exports = {
     logProgress,
     getProgressHistory,
-    addFeedback
+    addFeedback,
+    getBmiLogs,
+    getDailyLogs
 };
+
