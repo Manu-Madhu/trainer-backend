@@ -58,4 +58,16 @@ const deleteUser = async (req, res) => {
     }
 };
 
-module.exports = { getUsers, registerUser, toggleBlockStatus, deleteUser };
+// @desc    Update user
+// @route   PUT /api/users/:id
+// @access  Admin
+const updateUser = async (req, res) => {
+    try {
+        const user = await userService.updateUser(req.params.id, req.body);
+        res.json(user);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+module.exports = { getUsers, registerUser, toggleBlockStatus, deleteUser, updateUser };

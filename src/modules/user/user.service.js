@@ -62,9 +62,18 @@ const deleteUser = async (userId) => {
     return await userRepository.deleteUser(userId);
 };
 
+const updateUser = async (userId, updateData) => {
+    const user = await userRepository.findUserById(userId);
+    if (!user) {
+        throw new Error('User not found');
+    }
+    return await userRepository.updateUser(userId, updateData);
+};
+
 module.exports = {
     getAllUsers,
     registerUser,
     toggleUserBlockStatus,
-    deleteUser
+    deleteUser,
+    updateUser
 };

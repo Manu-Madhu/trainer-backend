@@ -8,5 +8,6 @@ router.get('/', userController.getUsers);
 router.post('/', upload.single('avatar'), userController.registerUser);
 router.patch('/:id/block', userController.toggleBlockStatus);
 router.delete('/:id', userController.deleteUser);
+router.put('/:id', userController.updateUser);
 
 module.exports = router;
