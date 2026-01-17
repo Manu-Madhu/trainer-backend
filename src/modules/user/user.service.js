@@ -1,4 +1,5 @@
 const userRepository = require('./user.repository');
+const bcrypt = require('bcryptjs');
 
 const getAllUsers = async (query = {}) => {
     const filter = {};
@@ -42,8 +43,20 @@ const registerUser = async (userData) => {
         throw new Error('User already exists');
     }
 
-    // In a real app, hash password here before sending to repo
-    return await userRepository.createUser(userData);
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(userData.password, salt);
+
+    // Prepare user data with hashed password and auto-verification
+    const userToCreate = {
+        ...userData,
+        password: hashedPassword,
+        isVerified: true, // Admin created users are auto-verified
+        otp: undefined,
+        otpExpires: undefined
+    };
+
+    return await userRepository.createUser(userToCreate);
 };
 
 const toggleUserBlockStatus = async (userId) => {
