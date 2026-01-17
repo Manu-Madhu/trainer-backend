@@ -63,7 +63,14 @@ const deleteUser = async (req, res) => {
 // @access  Admin
 const updateUser = async (req, res) => {
     try {
-        const user = await userService.updateUser(req.params.id, req.body);
+        let updateData = { ...req.body };
+
+        if (req.file) {
+            const avatarUrl = await uploadFileToS3(req.file);
+            updateData.avatar = avatarUrl;
+        }
+
+        const user = await userService.updateUser(req.params.id, updateData);
         res.json(user);
     } catch (error) {
         res.status(400).json({ message: error.message });
