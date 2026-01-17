@@ -85,11 +85,25 @@ const getMe = async (req, res) => {
     }
 };
 
+// @desc    Resend OTP
+// @route   POST /api/auth/resend-otp
+// @access  Public
+const resendOtp = async (req, res) => {
+    const { email } = req.body;
+    try {
+        const result = await authService.resendOtp(email);
+        res.json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
     verifyOtp,
     forgotPassword,
     resetPassword,
-    getMe
+    getMe,
+    resendOtp
 };

@@ -44,7 +44,7 @@ const register = async (userData) => {
 
             await sendEmail({
                 email: user.email,
-                subject: 'GymPro - Verify Your Email',
+                subject: 'Trainer - Verify Your Email',
                 message
             });
 
@@ -163,10 +163,40 @@ const resetPassword = async (email, otp, newPassword) => {
     }
 }
 
+const resendOtp = async (email) => {
+    const user = await User.findOne({ email });
+    if (!user) {
+        throw new Error('User not found');
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = Date.now() + 10 * 60 * 1000; // 10 mins
+
+    user.otp = otp;
+    user.otpExpires = otpExpires;
+    await user.save();
+
+    try {
+        const message = getOtpEmailTemplate(otp);
+        await sendEmail({
+            email: user.email,
+            subject: 'Trainer - New Verification Code',
+            message
+        });
+        return { message: 'New OTP sent to email' };
+    } catch (error) {
+        user.otp = undefined;
+        user.otpExpires = undefined;
+        await user.save();
+        throw new Error('Email could not be sent');
+    }
+};
+
 module.exports = {
     register,
     login,
     verifyOtp,
     forgotPassword,
-    resetPassword
+    resetPassword,
+    resendOtp
 };
