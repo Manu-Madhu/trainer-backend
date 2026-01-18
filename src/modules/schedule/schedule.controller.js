@@ -13,9 +13,11 @@ const createSchedule = async (req, res) => {
             return res.status(400).json({ message: 'Workout and Date are required' });
         }
 
-        // Validate Date (simple check)
+        // Validate and Normalize Date
+        // If it's a YYYY-MM-DD string, new Date(date) will be UTC midnight
+        // If it's an ISO string, it will be exact UTC time
         const scheduleDate = new Date(date);
-        scheduleDate.setHours(0, 0, 0, 0); // Normalize to start of day
+        scheduleDate.setUTCHours(0, 0, 0, 0); // Force to midnight UTC for storage consistency
 
         const workout = await Workout.findById(workoutId);
         if (!workout) {
@@ -150,12 +152,11 @@ const syncGlobalSchedules = async (req, res) => {
             return res.status(404).json({ message: 'Workout not found' });
         }
 
-        // Normalize range
+        // Normalize range to full days UTC
         const start = new Date(startDate || new Date());
-        start.setHours(0, 0, 0, 0);
+        start.setUTCHours(0, 0, 0, 0);
         const end = new Date(endDate || new Date());
-        end.setDate(end.getDate() + 7);
-        end.setHours(23, 59, 59, 999);
+        end.setUTCHours(23, 59, 59, 999);
 
         // 1. Delete all global schedules in this range for this category
         const deleteQuery = {
@@ -163,13 +164,14 @@ const syncGlobalSchedules = async (req, res) => {
             isGlobal: true,
             isPublic: isPublic === true
         };
-        await Schedule.deleteMany(deleteQuery);
+        const deletedCount = await Schedule.deleteMany(deleteQuery);
+        console.log(`Cleared ${deletedCount.deletedCount} existing global entries for category: ${isPublic ? 'FREE' : 'PREMIUM'}`);
 
         // 2. Create new schedules for selected dates
         const newSchedules = [];
         for (const dateStr of dates) {
             const d = new Date(dateStr);
-            d.setHours(0, 0, 0, 0);
+            d.setUTCHours(0, 0, 0, 0);
 
             newSchedules.push({
                 workout: workoutId,
