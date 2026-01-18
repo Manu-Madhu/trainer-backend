@@ -9,7 +9,33 @@ const createWorkout = async (data, creatorId) => {
 };
 
 const getWorkouts = async (query) => {
-    return await Workout.find(query);
+    const { page = 1, limit = 10, search, level, isPublic } = query;
+    const skip = (page - 1) * limit;
+
+    const filter = {};
+    if (search) {
+        filter.title = { $regex: search, $options: 'i' };
+    }
+    if (level) {
+        filter.level = level;
+    }
+    if (isPublic !== undefined) {
+        filter.isPublic = isPublic === 'true';
+    }
+
+    const workouts = await Workout.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit));
+
+    const total = await Workout.countDocuments(filter);
+
+    return {
+        workouts,
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / limit)
+    };
 };
 
 const getWorkoutById = async (id) => {
