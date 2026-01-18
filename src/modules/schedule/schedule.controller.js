@@ -19,18 +19,28 @@ const createSchedule = async (req, res) => {
 
         const workout = await Workout.findById(workoutId);
         if (!workout) {
+            console.warn('Workout not found:', workoutId);
             return res.status(404).json({ message: 'Workout not found' });
         }
+
+        console.log('Creating schedule:', {
+            workoutId,
+            isGlobal,
+            userId,
+            date: scheduleDate.toISOString(),
+            workoutIsPublic: workout.isPublic
+        });
 
         if (isGlobal) {
             // Check if global workout already exists for this date and visibility (Public vs Private)
             const existing = await Schedule.findOne({
                 date: scheduleDate,
                 isGlobal: true,
-                isPublic: workout.isPublic
+                isPublic: workout.isPublic === true // Ensure boolean
             });
 
             if (existing) {
+                console.log('Updating existing global schedule:', existing._id);
                 existing.workout = workoutId;
                 existing.assignedBy = req.user._id;
                 await existing.save();
@@ -41,7 +51,7 @@ const createSchedule = async (req, res) => {
                 workout: workoutId,
                 date: scheduleDate,
                 isGlobal: true,
-                isPublic: workout.isPublic,
+                isPublic: workout.isPublic === true,
                 assignedBy: req.user._id
             });
             return res.status(201).json(schedule);
@@ -54,6 +64,7 @@ const createSchedule = async (req, res) => {
             // check if user exists
             const user = await User.findById(userId);
             if (!user) {
+                console.warn('User not found:', userId);
                 return res.status(404).json({ message: 'User not found' });
             }
 
@@ -69,8 +80,15 @@ const createSchedule = async (req, res) => {
         }
 
     } catch (error) {
-        console.error('Create Schedule Error:', error);
-        res.status(500).json({ message: 'Server Error' });
+        console.error('Create Schedule Error Details:', {
+            message: error.message,
+            stack: error.stack,
+            body: req.body
+        });
+        res.status(500).json({
+            message: 'Server Error',
+            error: error.message // Temporarily return error message for debugging
+        });
     }
 };
 
