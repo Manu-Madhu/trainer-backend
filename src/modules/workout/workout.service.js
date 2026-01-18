@@ -55,6 +55,10 @@ const updateWorkout = async (id, data) => {
 };
 
 const deleteWorkout = async (id) => {
+    // 1. Delete associated schedules first
+    await Schedule.deleteMany({ workout: id });
+
+    // 2. Delete the workout itself
     return await Workout.findByIdAndDelete(id);
 };
 
