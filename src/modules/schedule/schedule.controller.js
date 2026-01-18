@@ -82,7 +82,27 @@ const getSchedules = async (req, res) => {
     }
 };
 
+// @desc    Delete schedule
+// @route   DELETE /api/schedule/:id
+// @access  Admin
+const deleteSchedule = async (req, res) => {
+    try {
+        const schedule = await Schedule.findById(req.params.id);
+
+        if (!schedule) {
+            return res.status(404).json({ message: 'Schedule not found' });
+        }
+
+        await schedule.deleteOne();
+        res.json({ message: 'Schedule removed' });
+    } catch (error) {
+        console.error('Delete Schedule Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 module.exports = {
     createSchedule,
-    getSchedules
+    getSchedules,
+    deleteSchedule
 };
