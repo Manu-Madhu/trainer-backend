@@ -153,8 +153,45 @@ const deleteSchedule = async (req, res) => {
     }
 };
 
+// @desc    Get current user's schedule for a specific date (Priority: User > Global)
+// @route   GET /api/schedule/my
+// @access  Private (User)
+const getMySchedule = async (req, res) => {
+    try {
+        const { date } = req.query;
+        const scheduleDate = date ? new Date(date) : new Date();
+        scheduleDate.setHours(0, 0, 0, 0);
+
+        // 1. Check for Personal Assignment (Highest Priority)
+        let schedule = await Schedule.findOne({
+            user: req.user._id,
+            date: scheduleDate,
+            isGlobal: false
+        }).populate('workout');
+
+        if (!schedule) {
+            // 2. Check for Global Assignment (Tier based)
+            // Free user -> isPublic: true
+            // Premium user -> isPublic: false
+            const userIsPremium = req.user.subscription?.plan === 'premium';
+
+            schedule = await Schedule.findOne({
+                isGlobal: true,
+                date: scheduleDate,
+                isPublic: !userIsPremium // if premium, look for isPublic: false (Private)
+            }).populate('workout');
+        }
+
+        res.json(schedule);
+    } catch (error) {
+        console.error('Get My Schedule Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 module.exports = {
     createSchedule,
     getSchedules,
-    deleteSchedule
+    deleteSchedule,
+    getMySchedule
 };
