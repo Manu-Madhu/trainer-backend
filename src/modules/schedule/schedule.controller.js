@@ -23,7 +23,7 @@ const createSchedule = async (req, res) => {
             return res.status(404).json({ message: 'Workout not found' });
         }
 
-        console.log('Creating schedule:', {
+        console.log('Creating/Updating schedule:', {
             workoutId,
             isGlobal,
             userId,
@@ -33,15 +33,25 @@ const createSchedule = async (req, res) => {
 
         if (isGlobal) {
             // Check if global workout already exists for this date and visibility (Public vs Private)
-            const existing = await Schedule.findOne({
+            // Handle legacy documents that might lack the isPublic field
+            const query = {
                 date: scheduleDate,
-                isGlobal: true,
-                isPublic: workout.isPublic === true // Ensure boolean
-            });
+                isGlobal: true
+            };
+
+            if (workout.isPublic) {
+                query.isPublic = true;
+            } else {
+                // If it's a private workout (for paid users), it might match existing docs with isPublic: false OR missing field
+                query.$or = [{ isPublic: false }, { isPublic: { $exists: false } }];
+            }
+
+            const existing = await Schedule.findOne(query);
 
             if (existing) {
                 console.log('Updating existing global schedule:', existing._id);
                 existing.workout = workoutId;
+                existing.isPublic = workout.isPublic === true; // Normalize on update
                 existing.assignedBy = req.user._id;
                 await existing.save();
                 return res.status(200).json(existing);
@@ -68,27 +78,40 @@ const createSchedule = async (req, res) => {
                 return res.status(404).json({ message: 'User not found' });
             }
 
+            // Check if personal assignment already exists (UPSERT)
+            const existing = await Schedule.findOne({
+                date: scheduleDate,
+                user: userId,
+                isGlobal: false
+            });
+
+            if (existing) {
+                console.log('Updating existing personal schedule for user:', userId);
+                existing.workout = workoutId;
+                existing.isPublic = workout.isPublic === true; // Keep metadata updated
+                existing.assignedBy = req.user._id;
+                await existing.save();
+                return res.status(200).json(existing);
+            }
+
             const schedule = await Schedule.create({
                 workout: workoutId,
                 date: scheduleDate,
                 user: userId,
                 isGlobal: false,
-                isPublic: workout.isPublic, // Store for easy filtering
+                isPublic: workout.isPublic === true,
                 assignedBy: req.user._id
             });
             return res.status(201).json(schedule);
         }
 
     } catch (error) {
-        console.error('Create Schedule Error Details:', {
+        console.error('Create Schedule Error:', {
             message: error.message,
-            stack: error.stack,
+            code: error.code,
             body: req.body
         });
-        res.status(500).json({
-            message: 'Server Error',
-            error: error.message // Temporarily return error message for debugging
-        });
+        res.status(500).json({ message: 'Server Error' });
     }
 };
 
