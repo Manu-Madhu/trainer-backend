@@ -1,5 +1,6 @@
 const Schedule = require('./schedule.model');
 const User = require('../user/user.model');
+const Workout = require('../workout/workout.model');
 
 // @desc    Assign workout (Global or User specific)
 // @route   POST /api/schedule
@@ -16,11 +17,20 @@ const createSchedule = async (req, res) => {
         const scheduleDate = new Date(date);
         scheduleDate.setHours(0, 0, 0, 0); // Normalize to start of day
 
+        const workout = await Workout.findById(workoutId);
+        if (!workout) {
+            return res.status(404).json({ message: 'Workout not found' });
+        }
+
         if (isGlobal) {
-            // Check if global workout already exists for this date
-            const existing = await Schedule.findOne({ date: scheduleDate, isGlobal: true });
+            // Check if global workout already exists for this date and visibility (Public vs Private)
+            const existing = await Schedule.findOne({
+                date: scheduleDate,
+                isGlobal: true,
+                isPublic: workout.isPublic
+            });
+
             if (existing) {
-                // Option: Overwrite or Error. Let's overwrite for flexibility.
                 existing.workout = workoutId;
                 existing.assignedBy = req.user._id;
                 await existing.save();
@@ -31,6 +41,7 @@ const createSchedule = async (req, res) => {
                 workout: workoutId,
                 date: scheduleDate,
                 isGlobal: true,
+                isPublic: workout.isPublic,
                 assignedBy: req.user._id
             });
             return res.status(201).json(schedule);
@@ -46,12 +57,12 @@ const createSchedule = async (req, res) => {
                 return res.status(404).json({ message: 'User not found' });
             }
 
-            // Check if already assigned? Maybe allow multiple? Let's allow multiple for now unless specified.
             const schedule = await Schedule.create({
                 workout: workoutId,
                 date: scheduleDate,
                 user: userId,
                 isGlobal: false,
+                isPublic: workout.isPublic, // Store for easy filtering
                 assignedBy: req.user._id
             });
             return res.status(201).json(schedule);

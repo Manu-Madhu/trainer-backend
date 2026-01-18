@@ -20,6 +20,10 @@ const scheduleSchema = mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        isPublic: {
+            type: Boolean,
+            default: false,
+        },
         assignedBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
@@ -31,8 +35,8 @@ const scheduleSchema = mongoose.Schema(
     }
 );
 
-// Compound index to prevent duplicate global workouts for the same day (optional, but good practice)
-scheduleSchema.index({ date: 1, isGlobal: 1 }, { unique: true, partialFilterExpression: { isGlobal: true } });
+// Compound index: prevent duplicate global workouts for the same day PER category (Public/Private)
+scheduleSchema.index({ date: 1, isGlobal: 1, isPublic: 1 }, { unique: true, partialFilterExpression: { isGlobal: true } });
 
 const Schedule = mongoose.model('Schedule', scheduleSchema);
 
