@@ -17,7 +17,7 @@ const createWorkout = async (req, res) => {
 // @access  Private (Trainer/Admin)
 const getWorkouts = async (req, res) => {
     try {
-        const workouts = await workoutService.getWorkouts({});
+        const workouts = await workoutService.getWorkouts(req.query);
         res.json(workouts);
     } catch (error) {
         res.status(500).json({ message: error.message });

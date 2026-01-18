@@ -6,7 +6,16 @@ const exerciseSchema = mongoose.Schema({
     reps: { type: Number, default: 10 },
     duration: { type: Number }, // in seconds (for cardio/timed)
     rest: { type: Number, default: 60 }, // in seconds
-    videoUrl: { type: String },
+    media: [{
+        type: { type: String, enum: ['image', 'video', 'gif'] },
+        url: { type: String },
+        name: { type: String }
+    }],
+    setType: {
+        type: String,
+        enum: ['Normal', 'Super Set', 'Drop Set', 'Circuit', 'Giant Set', 'Failure', 'Warm-up'],
+        default: 'Normal'
+    },
     instructions: { type: String },
 });
 
@@ -25,15 +34,20 @@ const workoutSchema = mongoose.Schema(
             default: 'beginner',
         },
         exercises: [exerciseSchema],
+        media: [{
+            type: { type: String, enum: ['image', 'video', 'gif'] },
+            url: { type: String },
+            name: { type: String }
+        }],
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
             required: true,
         },
-        assignedTo: {
+        assignedTo: [{
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
-        },
+        }],
         isPublic: {
             type: Boolean,
             default: false, // If true, available to all free users as sample
