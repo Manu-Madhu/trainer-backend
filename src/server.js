@@ -36,6 +36,7 @@ const chatRoutes = require('./modules/chat/chat.routes');
 const subscriptionRoutes = require('./modules/subscription/subscription.routes');
 const adminRoutes = require('./modules/admin/admin.routes');
 const uploadRoutes = require('./modules/upload/upload.routes');
+const scheduleRoutes = require('./modules/schedule/schedule.routes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -47,6 +48,7 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/schedule', scheduleRoutes);
 
 const PORT = process.env.PORT || 5000;
 
