@@ -158,36 +158,47 @@ const syncGlobalSchedules = async (req, res) => {
         const end = new Date(endDate || new Date());
         end.setUTCHours(23, 59, 59, 999);
 
-        // 1. Delete all global schedules in this range for this category
-        const deleteQuery = {
+        // 1. Handle Unassignments (Surgical Delete)
+        // Find all dates where THIS workout is currently assigned globally in this range
+        const existingSchedules = await Schedule.find({
+            workout: workoutId,
             date: { $gte: start, $lte: end },
-            isGlobal: true,
-            isPublic: isPublic === true
-        };
-        const deletedCount = await Schedule.deleteMany(deleteQuery);
-        console.log(`Cleared ${deletedCount.deletedCount} existing global entries for category: ${isPublic ? 'FREE' : 'PREMIUM'}`);
+            isGlobal: true
+        });
 
-        // 2. Create new schedules for selected dates
-        const newSchedules = [];
+        const newDateStrings = dates.map(ds => new Date(ds).toISOString().split('T')[0]);
+
+        for (const existing of existingSchedules) {
+            const existingDateStr = existing.date.toISOString().split('T')[0];
+            if (!newDateStrings.includes(existingDateStr)) {
+                await existing.deleteOne();
+                console.log(`Removed ${workout.title} from ${existingDateStr}`);
+            }
+        }
+
+        // 2. Handle Assignments (Upsert)
         for (const dateStr of dates) {
             const d = new Date(dateStr);
             d.setUTCHours(0, 0, 0, 0);
 
-            newSchedules.push({
-                workout: workoutId,
-                date: d,
-                isGlobal: true,
-                isPublic: isPublic === true,
-                assignedBy: req.user._id
-            });
+            // This replaces whatever workout was presiding on that date/category
+            await Schedule.findOneAndUpdate(
+                {
+                    date: d,
+                    isGlobal: true,
+                    isPublic: isPublic === true
+                },
+                {
+                    workout: workoutId,
+                    isPublic: isPublic === true,
+                    assignedBy: req.user._id
+                },
+                { upsert: true, new: true }
+            );
         }
 
-        if (newSchedules.length > 0) {
-            await Schedule.insertMany(newSchedules);
-        }
-
-        console.log(`Synced Global Planner: ${newSchedules.length} days set for ${isPublic ? 'FREE' : 'PREMIUM'} category.`);
-        res.status(200).json({ message: 'Global schedule synchronized successfully', count: newSchedules.length });
+        console.log(`Surgically Synced Planner for ${workout.title}: ${dates.length} days active.`);
+        res.status(200).json({ message: 'Global schedule synchronized successfully' });
     } catch (error) {
         console.error('Sync Global Schedules Error:', error);
         res.status(500).json({ message: 'Server Error' });
