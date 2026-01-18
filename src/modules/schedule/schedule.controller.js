@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Schedule = require('./schedule.model');
 const User = require('../user/user.model');
 const Workout = require('../workout/workout.model');
@@ -260,10 +261,82 @@ const getMySchedule = async (req, res) => {
     }
 };
 
+// @desc    Get paginated user assignments for a specific workout
+// @route   GET /api/schedule/workout/:workoutId/assignments
+// @access  Admin
+const getWorkoutAssignments = async (req, res) => {
+    try {
+        const { workoutId } = req.params;
+        const { page = 1, limit = 5, search, from, to } = req.query;
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        let pipeline = [
+            {
+                $match: {
+                    workout: new mongoose.Types.ObjectId(workoutId),
+                    isGlobal: false
+                }
+            }
+        ];
+
+        // Date Filter
+        if (from || to) {
+            let dateMatch = {};
+            if (from) dateMatch.$gte = new Date(from);
+            if (to) dateMatch.$lte = new Date(to);
+            pipeline.push({ $match: { date: dateMatch } });
+        }
+
+        // Lookup user details
+        pipeline.push({
+            $lookup: {
+                from: 'users',
+                localField: 'user',
+                foreignField: '_id',
+                as: 'user'
+            }
+        });
+        pipeline.push({ $unwind: '$user' });
+
+        // Search Filter (by User Name)
+        if (search) {
+            pipeline.push({
+                $match: {
+                    'user.name': { $regex: search, $options: 'i' }
+                }
+            });
+        }
+
+        // Get total count BEFORE skip/limit
+        const totalPipeline = [...pipeline, { $count: 'total' }];
+        const countResult = await Schedule.aggregate(totalPipeline);
+        const total = countResult.length > 0 ? countResult[0].total : 0;
+
+        // Sort and Paginate
+        pipeline.push({ $sort: { date: -1 } });
+        pipeline.push({ $skip: skip });
+        pipeline.push({ $limit: parseInt(limit) });
+
+        const assignments = await Schedule.aggregate(pipeline);
+
+        res.json({
+            assignments,
+            total,
+            pages: Math.ceil(total / parseInt(limit)),
+            page: parseInt(page)
+        });
+    } catch (error) {
+        console.error('Get Workout Assignments Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 module.exports = {
     createSchedule,
     getSchedules,
     deleteSchedule,
     getMySchedule,
-    syncGlobalSchedules
+    syncGlobalSchedules,
+    getWorkoutAssignments
 };
