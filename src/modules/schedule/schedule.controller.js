@@ -134,6 +134,64 @@ const getSchedules = async (req, res) => {
     }
 };
 
+// @desc    Sync global schedules for a date range (Delete existing and create new)
+// @route   POST /api/schedule/sync-global
+// @access  Admin
+const syncGlobalSchedules = async (req, res) => {
+    try {
+        const { workoutId, dates, isPublic, startDate, endDate } = req.body;
+
+        if (!workoutId || !dates || isPublic === undefined) {
+            return res.status(400).json({ message: 'Workout, dates, and category are required' });
+        }
+
+        const workout = await Workout.findById(workoutId);
+        if (!workout) {
+            return res.status(404).json({ message: 'Workout not found' });
+        }
+
+        // Normalize range
+        const start = new Date(startDate || new Date());
+        start.setHours(0, 0, 0, 0);
+        const end = new Date(endDate || new Date());
+        end.setDate(end.getDate() + 7);
+        end.setHours(23, 59, 59, 999);
+
+        // 1. Delete all global schedules in this range for this category
+        const deleteQuery = {
+            date: { $gte: start, $lte: end },
+            isGlobal: true,
+            isPublic: isPublic === true
+        };
+        await Schedule.deleteMany(deleteQuery);
+
+        // 2. Create new schedules for selected dates
+        const newSchedules = [];
+        for (const dateStr of dates) {
+            const d = new Date(dateStr);
+            d.setHours(0, 0, 0, 0);
+
+            newSchedules.push({
+                workout: workoutId,
+                date: d,
+                isGlobal: true,
+                isPublic: isPublic === true,
+                assignedBy: req.user._id
+            });
+        }
+
+        if (newSchedules.length > 0) {
+            await Schedule.insertMany(newSchedules);
+        }
+
+        console.log(`Synced Global Planner: ${newSchedules.length} days set for ${isPublic ? 'FREE' : 'PREMIUM'} category.`);
+        res.status(200).json({ message: 'Global schedule synchronized successfully', count: newSchedules.length });
+    } catch (error) {
+        console.error('Sync Global Schedules Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 // @desc    Delete schedule
 // @route   DELETE /api/schedule/:id
 // @access  Admin
@@ -193,5 +251,6 @@ module.exports = {
     createSchedule,
     getSchedules,
     deleteSchedule,
-    getMySchedule
+    getMySchedule,
+    syncGlobalSchedules
 };
