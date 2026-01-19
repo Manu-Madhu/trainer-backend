@@ -133,7 +133,7 @@ const getAdminPaidUsers = async (query = {}) => {
 };
 
 const getUserPaymentHistory = async (userId, query = {}) => {
-    const { status, page = 1, limit = 10, from, to } = query;
+    const { status, page = 1, limit = 10, from, to, search } = query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     let filter = { user: userId };
@@ -143,6 +143,10 @@ const getUserPaymentHistory = async (userId, query = {}) => {
 
     if (from && to) {
         filter.createdAt = { $gte: new Date(from), $lte: new Date(to) };
+    }
+
+    if (search) {
+        filter.notes = { $regex: search, $options: 'i' };
     }
 
     const history = await Payment.find(filter)
