@@ -60,10 +60,8 @@ const createSchedule = async (req, res) => {
                 console.log('Updating existing global schedule:', existing._id);
                 if (workoutId) {
                     existing.workout = workoutId;
-                    existing.mealPlan = undefined;
                 } else {
                     existing.mealPlan = mealPlanId;
-                    existing.workout = undefined;
                 }
                 existing.isPublic = targetPlan.isPublic === true;
                 existing.assignedBy = req.user._id;
@@ -106,10 +104,8 @@ const createSchedule = async (req, res) => {
                 console.log('Updating existing personal schedule for user:', userId);
                 if (workoutId) {
                     existing.workout = workoutId;
-                    existing.mealPlan = undefined;
                 } else {
                     existing.mealPlan = mealPlanId;
-                    existing.workout = undefined;
                 }
                 existing.isPublic = targetPlan.isPublic === true;
                 existing.assignedBy = req.user._id;
@@ -205,8 +201,17 @@ const syncGlobalSchedules = async (req, res) => {
         for (const existing of existingSchedules) {
             const existingDateStr = existing.date.toISOString().split('T')[0];
             if (!newDateStrings.includes(existingDateStr)) {
-                await existing.deleteOne();
-                console.log(`Removed ${targetPlan.title} from ${existingDateStr}`);
+                // Remove just THIS plan, not the whole entry if it has something else
+                if (workoutId) existing.workout = undefined;
+                else existing.mealPlan = undefined;
+
+                if (!existing.workout && !existing.mealPlan) {
+                    await existing.deleteOne();
+                    console.log(`Fully removed empty schedule from ${existingDateStr}`);
+                } else {
+                    await existing.save();
+                    console.log(`Removed ${targetPlan.title} from ${existingDateStr} (Preserved other assignments)`);
+                }
             }
         }
 
@@ -224,7 +229,6 @@ const syncGlobalSchedules = async (req, res) => {
                 },
                 {
                     [workoutId ? 'workout' : 'mealPlan']: (workoutId || mealPlanId),
-                    $unset: workoutId ? { mealPlan: "" } : { workout: "" },
                     isPublic: isPublic === true,
                     assignedBy: req.user._id
                 },
