@@ -14,16 +14,20 @@ const mealSchema = mongoose.Schema({
     type: {
         type: String,
         enum: ['breakfast', 'lunch', 'dinner', 'snack'],
-        required: true,
     },
     day: {
         type: String,
         enum: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
-        required: true,
     },
+    time: { type: String }, // Added to match frontend
     items: [foodItemSchema],
     totalCalories: { type: Number },
-    image: { type: String },
+    calories: { type: String }, // Added to match frontend
+    media: [{
+        type: { type: String, enum: ['image', 'video', 'gif'] },
+        url: { type: String },
+        name: { type: String }
+    }],
     instructions: { type: String },
 });
 
