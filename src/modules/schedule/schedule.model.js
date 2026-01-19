@@ -5,7 +5,12 @@ const scheduleSchema = mongoose.Schema(
         workout: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Workout',
-            required: true,
+            required: function () { return !this.mealPlan; }, // Required if mealPlan is not present
+        },
+        mealPlan: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'MealPlan',
+            required: function () { return !this.workout; }, // Required if workout is not present
         },
         date: {
             type: Date,

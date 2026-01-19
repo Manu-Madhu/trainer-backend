@@ -17,7 +17,7 @@ const createMealPlan = async (req, res) => {
 // @access  Private (Trainer/Admin)
 const getMealPlans = async (req, res) => {
     try {
-        const mealPlans = await mealService.getMealPlans({});
+        const mealPlans = await mealService.getMealPlans(req.query);
         res.json(mealPlans);
     } catch (error) {
         res.status(500).json({ message: error.message });

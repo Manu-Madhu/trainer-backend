@@ -37,15 +37,34 @@ const mealPlanSchema = mongoose.Schema(
             type: String,
         },
         meals: [mealSchema],
+        level: {
+            type: String,
+            enum: ['beginner', 'intermediate', 'advanced'],
+            default: 'beginner'
+        },
+        calories: {
+            type: String,
+        },
+        media: [{
+            id: String,
+            type: { type: String },
+            name: String,
+            url: String,
+            uri: String
+        }],
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
             required: true,
         },
-        assignedTo: {
+        assignedTo: [{
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
-        },
+        }],
+        isPublic: {
+            type: Boolean,
+            default: false,
+        }
     },
     {
         timestamps: true,

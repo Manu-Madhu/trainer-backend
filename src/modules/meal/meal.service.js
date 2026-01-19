@@ -1,4 +1,5 @@
 const MealPlan = require('./meal.model');
+const Schedule = require('../schedule/schedule.model');
 
 const createMealPlan = async (data, creatorId) => {
     const mealPlan = new MealPlan({
@@ -9,7 +10,33 @@ const createMealPlan = async (data, creatorId) => {
 };
 
 const getMealPlans = async (query) => {
-    return await MealPlan.find(query);
+    const { page = 1, limit = 10, search, level, isPublic } = query;
+    const skip = (page - 1) * limit;
+
+    const filter = {};
+    if (search) {
+        filter.title = { $regex: search, $options: 'i' };
+    }
+    if (level && level !== 'all') {
+        filter.level = level;
+    }
+    if (isPublic !== undefined) {
+        filter.isPublic = isPublic === 'true';
+    }
+
+    const meals = await MealPlan.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit));
+
+    const total = await MealPlan.countDocuments(filter);
+
+    return {
+        meals,
+        total,
+        page: parseInt(page),
+        pages: Math.ceil(total / limit)
+    };
 };
 
 const getMealPlanById = async (id) => {
@@ -21,6 +48,10 @@ const updateMealPlan = async (id, data) => {
 };
 
 const deleteMealPlan = async (id) => {
+    // 1. Delete associated schedules first
+    await Schedule.deleteMany({ mealPlan: id });
+
+    // 2. Delete the meal plan itself
     return await MealPlan.findByIdAndDelete(id);
 };
 

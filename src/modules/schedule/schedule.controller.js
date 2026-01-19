@@ -2,16 +2,17 @@ const mongoose = require('mongoose');
 const Schedule = require('./schedule.model');
 const User = require('../user/user.model');
 const Workout = require('../workout/workout.model');
+const MealPlan = require('../meal/meal.model');
 
 // @desc    Assign workout (Global or User specific)
 // @route   POST /api/schedule
 // @access  Admin
 const createSchedule = async (req, res) => {
     try {
-        const { workoutId, date, userId, isGlobal } = req.body;
+        const { workoutId, mealPlanId, date, userId, isGlobal } = req.body;
 
-        if (!workoutId || !date) {
-            return res.status(400).json({ message: 'Workout and Date are required' });
+        if ((!workoutId && !mealPlanId) || !date) {
+            return res.status(400).json({ message: 'Target (Workout/Meal) and Date are required' });
         }
 
         // Validate and Normalize Date
@@ -20,32 +21,36 @@ const createSchedule = async (req, res) => {
         const scheduleDate = new Date(date);
         scheduleDate.setUTCHours(0, 0, 0, 0); // Force to midnight UTC for storage consistency
 
-        const workout = await Workout.findById(workoutId);
-        if (!workout) {
-            console.warn('Workout not found:', workoutId);
-            return res.status(404).json({ message: 'Workout not found' });
+        let targetPlan;
+        if (workoutId) {
+            targetPlan = await Workout.findById(workoutId);
+        } else {
+            targetPlan = await MealPlan.findById(mealPlanId);
+        }
+
+        if (!targetPlan) {
+            return res.status(404).json({ message: 'Plan not found' });
         }
 
         console.log('Creating/Updating schedule:', {
             workoutId,
+            mealPlanId,
             isGlobal,
             userId,
             date: scheduleDate.toISOString(),
-            workoutIsPublic: workout.isPublic
+            isPublic: targetPlan.isPublic
         });
 
         if (isGlobal) {
-            // Check if global workout already exists for this date and visibility (Public vs Private)
-            // Handle legacy documents that might lack the isPublic field
+            // Check if global schedule already exists for this date and visibility (Public vs Private)
             const query = {
                 date: scheduleDate,
                 isGlobal: true
             };
 
-            if (workout.isPublic) {
+            if (targetPlan.isPublic) {
                 query.isPublic = true;
             } else {
-                // If it's a private workout (for paid users), it might match existing docs with isPublic: false OR missing field
                 query.$or = [{ isPublic: false }, { isPublic: { $exists: false } }];
             }
 
@@ -53,20 +58,29 @@ const createSchedule = async (req, res) => {
 
             if (existing) {
                 console.log('Updating existing global schedule:', existing._id);
-                existing.workout = workoutId;
-                existing.isPublic = workout.isPublic === true; // Normalize on update
+                if (workoutId) {
+                    existing.workout = workoutId;
+                    existing.mealPlan = undefined;
+                } else {
+                    existing.mealPlan = mealPlanId;
+                    existing.workout = undefined;
+                }
+                existing.isPublic = targetPlan.isPublic === true;
                 existing.assignedBy = req.user._id;
                 await existing.save();
                 return res.status(200).json(existing);
             }
 
-            const schedule = await Schedule.create({
-                workout: workoutId,
+            const scheduleData = {
                 date: scheduleDate,
                 isGlobal: true,
-                isPublic: workout.isPublic === true,
+                isPublic: targetPlan.isPublic === true,
                 assignedBy: req.user._id
-            });
+            };
+            if (workoutId) scheduleData.workout = workoutId;
+            else scheduleData.mealPlan = mealPlanId;
+
+            const schedule = await Schedule.create(scheduleData);
             return res.status(201).json(schedule);
         } else {
             // User Specific
@@ -90,21 +104,30 @@ const createSchedule = async (req, res) => {
 
             if (existing) {
                 console.log('Updating existing personal schedule for user:', userId);
-                existing.workout = workoutId;
-                existing.isPublic = workout.isPublic === true; // Keep metadata updated
+                if (workoutId) {
+                    existing.workout = workoutId;
+                    existing.mealPlan = undefined;
+                } else {
+                    existing.mealPlan = mealPlanId;
+                    existing.workout = undefined;
+                }
+                existing.isPublic = targetPlan.isPublic === true;
                 existing.assignedBy = req.user._id;
                 await existing.save();
                 return res.status(200).json(existing);
             }
 
-            const schedule = await Schedule.create({
-                workout: workoutId,
-                date: scheduleDate,
+            const scheduleData = {
                 user: userId,
+                date: scheduleDate,
                 isGlobal: false,
-                isPublic: workout.isPublic === true,
+                isPublic: targetPlan.isPublic === true,
                 assignedBy: req.user._id
-            });
+            };
+            if (workoutId) scheduleData.workout = workoutId;
+            else scheduleData.mealPlan = mealPlanId;
+
+            const schedule = await Schedule.create(scheduleData);
             return res.status(201).json(schedule);
         }
 
@@ -130,7 +153,11 @@ const getSchedules = async (req, res) => {
             query.date = { $gte: new Date(from), $lte: new Date(to) };
         }
 
-        const schedules = await Schedule.find(query).populate('workout').populate('user', 'name email');
+        const schedules = await Schedule.find(query)
+            .populate('workout')
+            .populate('mealPlan')
+            .populate('user', 'name email role subscription avatar')
+            .sort({ date: 1 });
         res.json(schedules);
     } catch (error) {
         res.status(500).json({ message: 'Server Error' });
@@ -142,15 +169,21 @@ const getSchedules = async (req, res) => {
 // @access  Admin
 const syncGlobalSchedules = async (req, res) => {
     try {
-        const { workoutId, dates, isPublic, startDate, endDate } = req.body;
+        const { workoutId, mealPlanId, dates, isPublic, startDate, endDate } = req.body;
 
-        if (!workoutId || !dates || isPublic === undefined) {
-            return res.status(400).json({ message: 'Workout, dates, and category are required' });
+        if ((!workoutId && !mealPlanId) || !dates || isPublic === undefined) {
+            return res.status(400).json({ message: 'Plan ID, dates, and category are required' });
         }
 
-        const workout = await Workout.findById(workoutId);
-        if (!workout) {
-            return res.status(404).json({ message: 'Workout not found' });
+        let targetPlan;
+        if (workoutId) {
+            targetPlan = await Workout.findById(workoutId);
+        } else {
+            targetPlan = await MealPlan.findById(mealPlanId);
+        }
+
+        if (!targetPlan) {
+            return res.status(404).json({ message: 'Plan not found' });
         }
 
         // Normalize range to full days UTC
@@ -160,9 +193,9 @@ const syncGlobalSchedules = async (req, res) => {
         end.setUTCHours(23, 59, 59, 999);
 
         // 1. Handle Unassignments (Surgical Delete)
-        // Find all dates where THIS workout is currently assigned globally in this range
+        // Find all dates where THIS plan is currently assigned globally in this range
         const existingSchedules = await Schedule.find({
-            workout: workoutId,
+            [workoutId ? 'workout' : 'mealPlan']: (workoutId || mealPlanId),
             date: { $gte: start, $lte: end },
             isGlobal: true
         });
@@ -173,7 +206,7 @@ const syncGlobalSchedules = async (req, res) => {
             const existingDateStr = existing.date.toISOString().split('T')[0];
             if (!newDateStrings.includes(existingDateStr)) {
                 await existing.deleteOne();
-                console.log(`Removed ${workout.title} from ${existingDateStr}`);
+                console.log(`Removed ${targetPlan.title} from ${existingDateStr}`);
             }
         }
 
@@ -182,7 +215,7 @@ const syncGlobalSchedules = async (req, res) => {
             const d = new Date(dateStr);
             d.setUTCHours(0, 0, 0, 0);
 
-            // This replaces whatever workout was presiding on that date/category
+            // This replaces whatever plan was presiding on that date/category
             await Schedule.findOneAndUpdate(
                 {
                     date: d,
@@ -190,7 +223,8 @@ const syncGlobalSchedules = async (req, res) => {
                     isPublic: isPublic === true
                 },
                 {
-                    workout: workoutId,
+                    [workoutId ? 'workout' : 'mealPlan']: (workoutId || mealPlanId),
+                    $unset: workoutId ? { mealPlan: "" } : { workout: "" },
                     isPublic: isPublic === true,
                     assignedBy: req.user._id
                 },
@@ -198,7 +232,7 @@ const syncGlobalSchedules = async (req, res) => {
             );
         }
 
-        console.log(`Surgically Synced Planner for ${workout.title}: ${dates.length} days active.`);
+        console.log(`Surgically Synced Planner for ${targetPlan.title}: ${dates.length} days active.`);
         res.status(200).json({ message: 'Global schedule synchronized successfully' });
     } catch (error) {
         console.error('Sync Global Schedules Error:', error);
@@ -239,7 +273,7 @@ const getMySchedule = async (req, res) => {
             user: req.user._id,
             date: scheduleDate,
             isGlobal: false
-        }).populate('workout');
+        }).populate('workout').populate('mealPlan');
 
         if (!schedule) {
             // 2. Check for Global Assignment (Tier based)
@@ -251,7 +285,7 @@ const getMySchedule = async (req, res) => {
                 isGlobal: true,
                 date: scheduleDate,
                 isPublic: !userIsPremium // if premium, look for isPublic: false (Private)
-            }).populate('workout');
+            }).populate('workout').populate('mealPlan');
         }
 
         res.json(schedule);
@@ -332,11 +366,82 @@ const getWorkoutAssignments = async (req, res) => {
     }
 };
 
+/**
+ * @desc    Get assignments for a specific meal plan (Paginated)
+ * @route   GET /api/schedule/meal/:mealId/assignments
+ */
+const getMealAssignments = async (req, res) => {
+    try {
+        const { mealId } = req.params;
+        const { page = 1, limit = 10, search, from, to } = req.query;
+        const skip = (page - 1) * limit;
+
+        const pipeline = [
+            {
+                $match: {
+                    mealPlan: new mongoose.Types.ObjectId(mealId),
+                    isGlobal: false // Only user assignments
+                }
+            }
+        ];
+
+        // Date Range Filter
+        if (from || to) {
+            const dateFilter = {};
+            if (from) dateFilter.$gte = new Date(from);
+            if (to) dateFilter.$lte = new Date(to);
+            pipeline.push({ $match: { date: dateFilter } });
+        }
+
+        // Lookup User details
+        pipeline.push({
+            $lookup: {
+                from: 'users',
+                localField: 'user',
+                foreignField: '_id',
+                as: 'user'
+            }
+        });
+        pipeline.push({ $unwind: '$user' });
+
+        // Search Filter (by User Name)
+        if (search) {
+            pipeline.push({
+                $match: {
+                    'user.name': { $regex: search, $options: 'i' }
+                }
+            });
+        }
+
+        // Get total count
+        const totalPipeline = [...pipeline, { $count: 'total' }];
+        const countResult = await Schedule.aggregate(totalPipeline);
+        const total = countResult.length > 0 ? countResult[0].total : 0;
+
+        pipeline.push({ $sort: { date: -1 } });
+        pipeline.push({ $skip: skip });
+        pipeline.push({ $limit: parseInt(limit) });
+
+        const assignments = await Schedule.aggregate(pipeline);
+
+        res.json({
+            assignments,
+            total,
+            pages: Math.ceil(total / parseInt(limit)),
+            page: parseInt(page)
+        });
+    } catch (error) {
+        console.error('Get Meal Assignments Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 module.exports = {
     createSchedule,
     getSchedules,
     deleteSchedule,
     getMySchedule,
     syncGlobalSchedules,
-    getWorkoutAssignments
+    getWorkoutAssignments,
+    getMealAssignments
 };
