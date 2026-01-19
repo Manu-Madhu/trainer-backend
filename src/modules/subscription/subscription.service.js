@@ -82,20 +82,34 @@ const getAdminStats = async () => {
 };
 
 const getAdminPaidUsers = async (query = {}) => {
-    const { search, from, to } = query;
+    const { search, from, to, page = 1, limit = 10 } = query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
     const now = new Date();
     const curMonth = now.getMonth() + 1;
     const curYear = now.getFullYear();
 
-    // Find all users with premium plan
+    // 1. Build Base User Query
     let userQuery = { 'subscription.plan': 'premium' };
+
     if (search) {
         userQuery.name = { $regex: search, $options: 'i' };
     }
 
-    const users = await User.find(userQuery).select('name email phone subscription avatar');
+    if (from || to) {
+        userQuery['subscription.startDate'] = {};
+        if (from) userQuery['subscription.startDate'].$gte = new Date(from);
+        if (to) userQuery['subscription.startDate'].$lte = new Date(to);
+    }
 
-    // For each user, check current month payment status
+    // 2. Fetch Users with Pagination
+    const users = await User.find(userQuery)
+        .select('name email phone subscription avatar')
+        .skip(skip)
+        .limit(parseInt(limit));
+
+    const total = await User.countDocuments(userQuery);
+
+    // 3. Attach Payment Status for Current Month
     const userList = await Promise.all(users.map(async (user) => {
         const payment = await Payment.findOne({
             user: user._id,
@@ -115,7 +129,7 @@ const getAdminPaidUsers = async (query = {}) => {
         };
     }));
 
-    return userList;
+    return { users: userList, total };
 };
 
 const getUserPaymentHistory = async (userId) => {

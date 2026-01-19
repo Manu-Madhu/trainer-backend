@@ -13,7 +13,7 @@ const paymentSchema = mongoose.Schema(
         },
         currency: {
             type: String,
-            default: 'USD',
+            default: 'INR',
         },
         month: {
             type: Number, // 1-12

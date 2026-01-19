@@ -12,7 +12,7 @@ const subscriptionPlanSchema = mongoose.Schema(
         },
         currency: {
             type: String,
-            default: 'USD',
+            default: 'INR',
         },
         durationInDays: {
             type: Number,

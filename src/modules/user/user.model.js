@@ -50,7 +50,9 @@ const userSchema = mongoose.Schema(
             type: String, // 'lose_weight', 'build_muscle', etc.
         },
         activityLevel: {
-            type: String, // 'sedentary', 'active', etc.
+            type: String, // 'sedentary', 'active', 'gym', etc.
+            enum: ['sedentary', 'active', 'gym', 'athlete'],
+            default: 'sedentary'
         },
         medicalConditions: {
             type: [String],
