@@ -37,8 +37,47 @@ const createPlan = async (req, res) => {
     }
 };
 
+// @desc    Get admin subscription stats
+// @route   GET /api/subscriptions/admin/stats
+// @access  Private (Admin)
+const getAdminStats = async (req, res) => {
+    try {
+        const stats = await subscriptionService.getAdminStats();
+        res.json(stats);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Get admin paid users listing
+// @route   GET /api/subscriptions/admin/users
+// @access  Private (Admin)
+const getAdminPaidUsers = async (req, res) => {
+    try {
+        const users = await subscriptionService.getAdminPaidUsers(req.query);
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Get user payment history
+// @route   GET /api/subscriptions/history/:userId
+// @access  Private (Admin)
+const getUserPaymentHistory = async (req, res) => {
+    try {
+        const history = await subscriptionService.getUserPaymentHistory(req.params.userId);
+        res.json(history);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     getPlans,
     subscribe,
-    createPlan
+    createPlan,
+    getAdminStats,
+    getAdminPaidUsers,
+    getUserPaymentHistory
 };
