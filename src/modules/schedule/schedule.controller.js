@@ -41,14 +41,11 @@ const createSchedule = async (req, res) => {
             isPublic: targetPlan.isPublic
         });
 
-        const targetType = workoutId ? 'workout' : 'meal';
-
         if (isGlobal) {
-            // Check if global schedule already exists for this date, audience AND type
+            // Check if global schedule already exists for this date and visibility
             const query = {
                 date: scheduleDate,
-                isGlobal: true,
-                targetType
+                isGlobal: true
             };
 
             if (targetPlan.isPublic) {
@@ -60,10 +57,10 @@ const createSchedule = async (req, res) => {
             const existing = await Schedule.findOne(query);
 
             if (existing) {
-                console.log(`Updating existing global ${targetType} schedule:`, existing._id);
+                console.log('Updating existing global schedule:', existing._id);
                 if (workoutId) {
                     existing.workout = workoutId;
-                } else {
+                } else if (mealPlanId) {
                     existing.mealPlan = mealPlanId;
                 }
                 existing.isPublic = targetPlan.isPublic === true;
@@ -75,7 +72,6 @@ const createSchedule = async (req, res) => {
             const scheduleData = {
                 date: scheduleDate,
                 isGlobal: true,
-                targetType,
                 isPublic: targetPlan.isPublic === true,
                 assignedBy: req.user._id
             };
@@ -96,17 +92,16 @@ const createSchedule = async (req, res) => {
                 return res.status(404).json({ message: 'User not found' });
             }
 
-            // Check if personal assignment already exists for this type
+            // Check if personal assignment already exists (UPSERT)
             const existing = await Schedule.findOne({
                 date: scheduleDate,
                 user: userId,
-                isGlobal: false,
-                targetType
+                isGlobal: false
             });
 
             if (existing) {
                 if (workoutId) existing.workout = workoutId;
-                else existing.mealPlan = mealPlanId;
+                else if (mealPlanId) existing.mealPlan = mealPlanId;
 
                 existing.isPublic = targetPlan.isPublic === true;
                 existing.assignedBy = req.user._id;
@@ -118,7 +113,6 @@ const createSchedule = async (req, res) => {
                 user: userId,
                 date: scheduleDate,
                 isGlobal: false,
-                targetType,
                 isPublic: targetPlan.isPublic === true,
                 assignedBy: req.user._id
             };
@@ -184,18 +178,16 @@ const syncGlobalSchedules = async (req, res) => {
             return res.status(404).json({ message: 'Plan not found' });
         }
 
-        const targetType = workoutId ? 'workout' : 'meal';
         const start = new Date(startDate || new Date());
         start.setUTCHours(0, 0, 0, 0);
         const end = new Date(endDate || new Date());
         end.setUTCHours(23, 59, 59, 999);
 
-        // 1. Handle Unassignments for this type only
+        // 1. Handle Unassignments (Surgical Nullification)
         const existingSchedules = await Schedule.find({
             [workoutId ? 'workout' : 'mealPlan']: (workoutId || mealPlanId),
             date: { $gte: start, $lte: end },
-            isGlobal: true,
-            targetType
+            isGlobal: true
         });
 
         const newDateStrings = dates.map(ds => new Date(ds).toISOString().split('T')[0]);
@@ -203,12 +195,20 @@ const syncGlobalSchedules = async (req, res) => {
         for (const existing of existingSchedules) {
             const existingDateStr = existing.date.toISOString().split('T')[0];
             if (!newDateStrings.includes(existingDateStr)) {
-                await existing.deleteOne();
-                console.log(`Removed ${targetType} plan from ${existingDateStr}`);
+                // IMPORTANT: Just null the field, don't delete doc if it has other category
+                if (workoutId) existing.workout = undefined;
+                else existing.mealPlan = undefined;
+
+                if (!existing.workout && !existing.mealPlan) {
+                    await existing.deleteOne();
+                } else {
+                    await existing.save();
+                }
+                console.log(`Removed ${workoutId ? 'workout' : 'meal'} plan from ${existingDateStr}`);
             }
         }
 
-        // 2. Handle Assignments (Upsert scoped by type)
+        // 2. Handle Assignments (Additive Upsert)
         for (const dateStr of dates) {
             const d = new Date(dateStr);
             d.setUTCHours(0, 0, 0, 0);
@@ -217,7 +217,6 @@ const syncGlobalSchedules = async (req, res) => {
                 {
                     date: d,
                     isGlobal: true,
-                    targetType,
                     isPublic: isPublic === true
                 },
                 {
