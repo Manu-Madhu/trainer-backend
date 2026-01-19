@@ -132,8 +132,27 @@ const getAdminPaidUsers = async (query = {}) => {
     return { users: userList, total };
 };
 
-const getUserPaymentHistory = async (userId) => {
-    return await Payment.find({ user: userId }).sort({ year: -1, month: -1 });
+const getUserPaymentHistory = async (userId, query = {}) => {
+    const { status, page = 1, limit = 10, from, to } = query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    let filter = { user: userId };
+    if (status) {
+        filter.status = status;
+    }
+
+    if (from && to) {
+        filter.createdAt = { $gte: new Date(from), $lte: new Date(to) };
+    }
+
+    const history = await Payment.find(filter)
+        .sort({ year: -1, month: -1 })
+        .skip(skip)
+        .limit(parseInt(limit));
+
+    const total = await Payment.countDocuments(filter);
+
+    return { history, total };
 };
 
 module.exports = {

@@ -66,8 +66,8 @@ const getAdminPaidUsers = async (req, res) => {
 // @access  Private (Admin)
 const getUserPaymentHistory = async (req, res) => {
     try {
-        const history = await subscriptionService.getUserPaymentHistory(req.params.userId);
-        res.json(history);
+        const result = await subscriptionService.getUserPaymentHistory(req.params.userId, req.query);
+        res.json(result);
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
