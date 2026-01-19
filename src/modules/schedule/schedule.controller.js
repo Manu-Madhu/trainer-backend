@@ -432,6 +432,39 @@ const getMealAssignments = async (req, res) => {
     }
 };
 
+/**
+ * @desc    Get daily schedule overview for admin (Global + Personal)
+ * @route   GET /api/schedule/admin/daily
+ * @access  Admin
+ */
+const getAdminDailySchedule = async (req, res) => {
+    try {
+        const { date } = req.query;
+        if (!date) {
+            return res.status(400).json({ message: 'Date is required' });
+        }
+
+        const scheduleDate = new Date(date);
+        scheduleDate.setUTCHours(0, 0, 0, 0);
+
+        const schedules = await Schedule.find({ date: scheduleDate })
+            .populate('workout')
+            .populate('mealPlan')
+            .populate('user', 'name email avatar role subscription');
+
+        const result = {
+            globalFree: schedules.find(s => s.isGlobal && s.isPublic),
+            globalPaid: schedules.find(s => s.isGlobal && !s.isPublic),
+            personalAssignments: schedules.filter(s => !s.isGlobal)
+        };
+
+        res.json(result);
+    } catch (error) {
+        console.error('Get Admin Daily Schedule Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 module.exports = {
     createSchedule,
     getSchedules,
@@ -439,5 +472,6 @@ module.exports = {
     getMySchedule,
     syncGlobalSchedules,
     getWorkoutAssignments,
-    getMealAssignments
+    getMealAssignments,
+    getAdminDailySchedule
 };
