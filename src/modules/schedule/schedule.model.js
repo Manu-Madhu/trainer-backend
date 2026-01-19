@@ -29,6 +29,11 @@ const scheduleSchema = mongoose.Schema(
             type: Boolean,
             default: false,
         },
+        targetType: {
+            type: String,
+            enum: ['workout', 'meal'],
+            required: true,
+        },
         assignedBy: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
@@ -40,8 +45,8 @@ const scheduleSchema = mongoose.Schema(
     }
 );
 
-// Compound index: prevent duplicate global workouts for the same day PER category (Public/Private)
-scheduleSchema.index({ date: 1, isGlobal: 1, isPublic: 1 }, { unique: true, partialFilterExpression: { isGlobal: true } });
+// Compound index: prevent duplicate global schedules for the same day PER category AND PER type
+scheduleSchema.index({ date: 1, isGlobal: 1, isPublic: 1, targetType: 1 }, { unique: true, partialFilterExpression: { isGlobal: true } });
 
 const Schedule = mongoose.model('Schedule', scheduleSchema);
 
