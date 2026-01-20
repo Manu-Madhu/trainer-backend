@@ -77,7 +77,15 @@ const getMe = async (req, res) => {
             email: req.user.email,
             role: req.user.role,
             avatar: req.user.avatar,
-            subscription: req.user.subscription
+            subscription: req.user.subscription,
+            height: req.user.height,
+            currentWeight: req.user.currentWeight,
+            targetWeight: req.user.targetWeight,
+            bmi: req.user.bmi,
+            gender: req.user.gender,
+            age: req.user.age,
+            fitnessGoal: req.user.fitnessGoal,
+            activityLevel: req.user.activityLevel,
         };
         res.json(user);
     } catch (error) {

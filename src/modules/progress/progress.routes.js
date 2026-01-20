@@ -8,5 +8,6 @@ router.get('/history', protect, progressController.getProgressHistory);
 router.post('/feedback', protect, trainer, progressController.addFeedback);
 router.get('/bmi/:userId', protect, progressController.getBmiLogs);
 router.get('/daily/:userId', protect, progressController.getDailyLogs);
+router.post('/daily', protect, progressController.logDailyActivity);
 
 module.exports = router;

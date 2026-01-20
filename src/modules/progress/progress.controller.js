@@ -67,10 +67,23 @@ const getDailyLogs = async (req, res) => {
     }
 };
 
+// @desc    Log daily activity
+// @route   POST /api/progress/daily
+// @access  Private (User)
+const logDailyActivity = async (req, res) => {
+    try {
+        const log = await progressService.logDailyActivity(req.body, req.user._id);
+        res.status(201).json(log);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
 module.exports = {
     logProgress,
     getProgressHistory,
     addFeedback,
     getBmiLogs,
-    getDailyLogs
+    getDailyLogs,
+    logDailyActivity
 };

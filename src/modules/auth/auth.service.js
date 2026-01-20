@@ -125,6 +125,14 @@ const login = async (email, password) => {
             role: user.role,
             avatar: user.avatar,
             subscription: user.subscription,
+            height: user.height,
+            currentWeight: user.currentWeight,
+            targetWeight: user.targetWeight,
+            bmi: user.bmi,
+            gender: user.gender,
+            age: user.age,
+            fitnessGoal: user.fitnessGoal,
+            activityLevel: user.activityLevel,
             token: generateToken(user._id),
         };
     } else {
@@ -152,6 +160,14 @@ const verifyOtp = async (email, otp) => {
             name: user.name,
             email: user.email,
             role: user.role,
+            height: user.height,
+            currentWeight: user.currentWeight,
+            targetWeight: user.targetWeight,
+            bmi: user.bmi,
+            gender: user.gender,
+            age: user.age,
+            fitnessGoal: user.fitnessGoal,
+            activityLevel: user.activityLevel,
             token: generateToken(user._id)
         };
     } else {

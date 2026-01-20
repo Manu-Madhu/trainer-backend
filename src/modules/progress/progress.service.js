@@ -31,12 +31,12 @@ const getBmiLogs = async (userId, from, to) => {
     const user = await User.findById(userId).select('height');
     const logs = await Progress.find(dateFilter).sort({ date: -1 });
 
-    if (!user || !user.height) return logs; // user might not have height
 
-    const heightInMeters = user.height / 100;
+    const heightInMeters = (user && user.height) ? user.height / 100 : null;
+
     return logs.map(log => {
         let bmi = null;
-        if (log.weight) {
+        if (log.weight && heightInMeters) {
             bmi = log.weight / (heightInMeters * heightInMeters);
         }
         return {
@@ -49,6 +49,7 @@ const getBmiLogs = async (userId, from, to) => {
     });
 };
 
+
 const getDailyLogs = async (userId, from, to) => {
     const dateFilter = { user: userId };
     if (from || to) {
@@ -59,11 +60,38 @@ const getDailyLogs = async (userId, from, to) => {
     return await DailyLog.find(dateFilter).sort({ date: -1 });
 };
 
+const logDailyActivity = async (data, userId) => {
+    // Check if log exists for this date (ignoring time)
+    const startOfDay = new Date(data.date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(data.date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    let log = await DailyLog.findOne({
+        user: userId,
+        date: { $gte: startOfDay, $lte: endOfDay }
+    });
+
+    if (log) {
+        // Update existing
+        Object.assign(log, data);
+        return await log.save();
+    } else {
+        // Create new
+        log = new DailyLog({
+            ...data,
+            user: userId
+        });
+        return await log.save();
+    }
+};
+
 module.exports = {
     logProgress,
     getProgressHistory,
     addFeedback,
     getBmiLogs,
-    getDailyLogs
+    getDailyLogs,
+    logDailyActivity
 };
 
