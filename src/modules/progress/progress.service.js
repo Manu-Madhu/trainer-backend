@@ -1,4 +1,6 @@
 const Progress = require('./progress.model');
+const DailyLog = require('./dailyLog.model');
+const User = require('../user/user.model');
 
 const logProgress = async (data, userId) => {
     const progress = new Progress({
@@ -16,8 +18,7 @@ const addFeedback = async (id, feedback) => {
     return await Progress.findByIdAndUpdate(id, { trainerFeedback: feedback }, { new: true });
 };
 
-const DailyLog = require('./dailyLog.model');
-const User = require('../user/user.model');
+
 
 const getBmiLogs = async (userId, from, to, page = 1, limit = 10) => {
     // Build date filter

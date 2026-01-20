@@ -48,10 +48,14 @@ const addFeedback = async (req, res) => {
 const getBmiLogs = async (req, res) => {
     try {
         const { userId } = req.params;
-        const { from, to, page = 1, limit = 10 } = req.query;
-        const logs = await progressService.getBmiLogs(userId, from, to, parseInt(page), parseInt(limit));
+        const { from, to, page, limit } = req.query;
+        const pageNum = parseInt(page) || 1;
+        const limitNum = parseInt(limit) || 10;
+
+        const logs = await progressService.getBmiLogs(userId, from, to, pageNum, limitNum);
         res.json(logs);
     } catch (error) {
+        console.error('Error in getBmiLogs:', error);
         res.status(500).json({ message: error.message });
     }
 };
@@ -59,10 +63,14 @@ const getBmiLogs = async (req, res) => {
 const getDailyLogs = async (req, res) => {
     try {
         const { userId } = req.params;
-        const { from, to, page = 1, limit = 10 } = req.query;
-        const logs = await progressService.getDailyLogs(userId, from, to, parseInt(page), parseInt(limit));
+        const { from, to, page, limit } = req.query;
+        const pageNum = parseInt(page) || 1;
+        const limitNum = parseInt(limit) || 10;
+
+        const logs = await progressService.getDailyLogs(userId, from, to, pageNum, limitNum);
         res.json(logs);
     } catch (error) {
+        console.error('Error in getDailyLogs:', error);
         res.status(500).json({ message: error.message });
     }
 };
