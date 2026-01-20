@@ -19,7 +19,7 @@ const addFeedback = async (id, feedback) => {
 const DailyLog = require('./dailyLog.model');
 const User = require('../user/user.model');
 
-const getBmiLogs = async (userId, from, to) => {
+const getBmiLogs = async (userId, from, to, page = 1, limit = 10) => {
     // Build date filter
     const dateFilter = { user: userId };
     if (from || to) {
@@ -28,8 +28,13 @@ const getBmiLogs = async (userId, from, to) => {
         if (to) dateFilter.date.$lte = new Date(to);
     }
 
+    const skip = (page - 1) * limit;
+
     const user = await User.findById(userId).select('height');
-    const logs = await Progress.find(dateFilter).sort({ date: -1 });
+    const logs = await Progress.find(dateFilter)
+        .sort({ date: -1 })
+        .skip(skip)
+        .limit(limit);
 
 
     const heightInMeters = (user && user.height) ? user.height / 100 : null;
@@ -50,14 +55,20 @@ const getBmiLogs = async (userId, from, to) => {
 };
 
 
-const getDailyLogs = async (userId, from, to) => {
+const getDailyLogs = async (userId, from, to, page = 1, limit = 10) => {
     const dateFilter = { user: userId };
     if (from || to) {
         dateFilter.date = {};
         if (from) dateFilter.date.$gte = new Date(from);
         if (to) dateFilter.date.$lte = new Date(to);
     }
-    return await DailyLog.find(dateFilter).sort({ date: -1 });
+
+    const skip = (page - 1) * limit;
+
+    return await DailyLog.find(dateFilter)
+        .sort({ date: -1 })
+        .skip(skip)
+        .limit(limit);
 };
 
 const logDailyActivity = async (data, userId) => {
