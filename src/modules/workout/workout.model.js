@@ -5,6 +5,7 @@ const exerciseSchema = mongoose.Schema({
     sets: { type: Number, default: 3 },
     reps: { type: Number, default: 10 },
     duration: { type: Number }, // in seconds (for cardio/timed)
+    caloriesBurned: { type: Number, default: 0 }, // Estimated calories burned
     rest: { type: Number, default: 60 }, // in seconds
     media: [{
         type: { type: String, enum: ['image', 'video', 'gif'] },

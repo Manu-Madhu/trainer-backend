@@ -44,6 +44,9 @@ const paymentSchema = mongoose.Schema(
         },
         notes: {
             type: String,
+        },
+        screenshotUrl: {
+            type: String, // URL of the payment screenshot
         }
     },
     {

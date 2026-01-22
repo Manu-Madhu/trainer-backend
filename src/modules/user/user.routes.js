@@ -4,6 +4,11 @@ const userController = require('./user.controller');
 
 const upload = require('../../middleware/upload');
 
+const { protect } = require('../../middleware/authMiddleware');
+
+router.get('/home', protect, userController.getHomeData);
+router.post('/premium-request', protect, upload.single('screenshot'), userController.requestPremium);
+
 router.get('/', userController.getUsers);
 router.get('/:id', userController.getUserById);
 router.post('/', upload.single('avatar'), userController.registerUser);

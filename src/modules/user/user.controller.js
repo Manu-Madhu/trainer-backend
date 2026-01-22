@@ -88,4 +88,40 @@ const updateUser = async (req, res) => {
     }
 };
 
-module.exports = { getUsers, getUserById, registerUser, toggleBlockStatus, deleteUser, updateUser };
+// @desc    Get User Home Data
+// @route   GET /api/users/home
+// @access  Private
+const getHomeData = async (req, res) => {
+    try {
+        // Assuming req.user.id is populated by auth middleware
+        const data = await userService.getHomeData(req.user.id);
+        res.json(data);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Request Premium
+// @route   POST /api/users/premium-request
+// @access  Private
+const requestPremium = async (req, res) => {
+    try {
+        let screenshotUrl = null;
+        if (req.file) {
+            screenshotUrl = await uploadFileToS3(req.file);
+        } else if (req.body.screenshotUrl) {
+            screenshotUrl = req.body.screenshotUrl;
+        }
+
+        if (!screenshotUrl) {
+            return res.status(400).json({ message: 'Screenshot is required' });
+        }
+
+        const result = await userService.requestPremium(req.user.id, screenshotUrl);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { getUsers, getUserById, registerUser, toggleBlockStatus, deleteUser, updateUser, getHomeData, requestPremium };

@@ -1,4 +1,7 @@
 const userRepository = require('./user.repository');
+const Schedule = require('../schedule/schedule.model');
+const DailyLog = require('../progress/dailyLog.model');
+const Payment = require('../subscription/payment.model');
 const bcrypt = require('bcryptjs');
 const sendEmail = require('../../utils/sendEmail');
 const { getWelcomeEmailTemplate } = require('../../utils/emailTemplates');
@@ -105,11 +108,99 @@ const updateUser = async (userId, updateData) => {
     return await userRepository.updateUser(userId, updateData);
 };
 
+const getHomeData = async (userId) => {
+    const user = await userRepository.findUserById(userId);
+    if (!user) throw new Error('User not found');
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // 1. Get Today's Schedule (Workout & Meal Plan)
+    const schedules = await Schedule.find({
+        user: userId,
+        date: { $gte: today, $lt: tomorrow }
+    }).populate('workout').populate('mealPlan');
+
+    let workoutToday = null;
+    let mealPlanToday = null;
+
+    // 2. Get Daily Log
+    const dailyLog = await DailyLog.findOne({
+        user: userId,
+        date: { $gte: today, $lt: tomorrow }
+    });
+
+    let kcalBurned = 0;
+    let kcalEaten = 0;
+    let targetBurn = 0;
+    let targetEat = 0;
+
+    for (const s of schedules) {
+        if (s.workout) {
+            workoutToday = s.workout;
+            targetBurn += (workoutToday.caloriesBurned || 0);
+        }
+        if (s.mealPlan) {
+            mealPlanToday = s.mealPlan;
+            if (mealPlanToday.meals) {
+                mealPlanToday.meals.forEach(m => {
+                    if (m.totalCalories) targetEat += m.totalCalories;
+                });
+            }
+        }
+    }
+
+    if (dailyLog?.workoutCompleted) {
+        kcalBurned = targetBurn;
+    }
+
+    if (dailyLog?.mealsCompleted) {
+        kcalEaten = targetEat;
+    }
+
+    return {
+        user,
+        stats: {
+            burned: { current: kcalBurned, target: targetBurn },
+            eaten: { current: kcalEaten, target: targetEat },
+            bmi: user.bmi || 0
+        },
+        workoutToday,
+        mealPlan: mealPlanToday
+    };
+};
+
+const requestPremium = async (userId, screenshotUrl) => {
+    // Check if pending request exists
+    const existing = await Payment.findOne({ user: userId, status: 'pending' });
+    if (existing) {
+        existing.screenshotUrl = screenshotUrl;
+        return await existing.save();
+    }
+
+    const payment = await Payment.create({
+        user: userId,
+        amount: 300,
+        currency: 'INR',
+        month: new Date().getMonth() + 1,
+        year: new Date().getFullYear(),
+        status: 'pending',
+        method: 'manual_upi',
+        screenshotUrl
+    });
+    return payment;
+};
+
 module.exports = {
     getAllUsers,
     getUserById,
     registerUser,
     toggleUserBlockStatus,
     deleteUser,
-    updateUser
+    deleteUser,
+    updateUser,
+    getHomeData,
+    requestPremium
 };
