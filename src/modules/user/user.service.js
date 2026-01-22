@@ -1,6 +1,7 @@
 const userRepository = require('./user.repository');
 const Schedule = require('../schedule/schedule.model');
 const DailyLog = require('../progress/dailyLog.model');
+const Progress = require('../progress/progress.model');
 const Payment = require('../subscription/payment.model');
 const bcrypt = require('bcryptjs');
 const sendEmail = require('../../utils/sendEmail');
@@ -165,11 +166,12 @@ const getHomeData = async (userId) => {
         stats: {
             burned: { current: kcalBurned, target: targetBurn },
             eaten: { current: kcalEaten, target: targetEat },
-            bmi: user.bmi || 0
+            bmi: bmi ? parseFloat(bmi.toFixed(1)) : 0
         },
+    },
         workoutToday,
         mealPlan: mealPlanToday
-    };
+};
 };
 
 const requestPremium = async (userId, screenshotUrl) => {
