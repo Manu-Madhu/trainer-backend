@@ -161,6 +161,19 @@ const getHomeData = async (userId) => {
         kcalEaten = targetEat;
     }
 
+    // 3. Get BMI
+    const lastProgress = await Progress.findOne({ user: userId }).sort({ date: -1 });
+    let currentWeight = user.currentWeight;
+    if (lastProgress && lastProgress.weight) {
+        currentWeight = lastProgress.weight;
+    }
+
+    let bmi = user.bmi || 0;
+    if (user.height && currentWeight) {
+        const heightInM = user.height / 100;
+        bmi = currentWeight / (heightInM * heightInM);
+    }
+
     return {
         user,
         stats: {
@@ -168,10 +181,9 @@ const getHomeData = async (userId) => {
             eaten: { current: kcalEaten, target: targetEat },
             bmi: bmi ? parseFloat(bmi.toFixed(1)) : 0
         },
-    },
         workoutToday,
         mealPlan: mealPlanToday
-};
+    };
 };
 
 const requestPremium = async (userId, screenshotUrl) => {
