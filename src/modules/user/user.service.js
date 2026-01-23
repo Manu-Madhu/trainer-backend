@@ -130,7 +130,14 @@ const getHomeData = async (userId) => {
     let workoutToday = null;
     let mealPlanToday = null;
 
-    // 2. Get Daily Log
+    // 2. Prioritize Assignments (User Specific > Global)
+    const specificSchedules = schedules.filter(s => s.user && s.user.toString() === userId.toString());
+    const globalSchedules = schedules.filter(s => s.isGlobal);
+
+    const activeWorkoutSchedule = specificSchedules.find(s => s.workout) || globalSchedules.find(s => s.workout);
+    const activeMealSchedule = specificSchedules.find(s => s.mealPlan) || globalSchedules.find(s => s.mealPlan);
+
+    // 3. Get Daily Log
     const dailyLog = await DailyLog.findOne({
         user: userId,
         date: { $gte: today, $lt: tomorrow }
@@ -141,18 +148,17 @@ const getHomeData = async (userId) => {
     let targetBurn = 0;
     let targetEat = 0;
 
-    for (const s of schedules) {
-        if (s.workout) {
-            workoutToday = s.workout;
-            targetBurn += (workoutToday.caloriesBurned || 0);
-        }
-        if (s.mealPlan) {
-            mealPlanToday = s.mealPlan;
-            if (mealPlanToday.meals) {
-                mealPlanToday.meals.forEach(m => {
-                    if (m.totalCalories) targetEat += m.totalCalories;
-                });
-            }
+    if (activeWorkoutSchedule) {
+        workoutToday = activeWorkoutSchedule.workout;
+        targetBurn = workoutToday.caloriesBurned || 0;
+    }
+
+    if (activeMealSchedule) {
+        mealPlanToday = activeMealSchedule.mealPlan;
+        if (mealPlanToday.meals) {
+            mealPlanToday.meals.forEach(m => {
+                if (m.totalCalories) targetEat += m.totalCalories;
+            });
         }
     }
 
