@@ -261,81 +261,135 @@ const deleteSchedule = async (req, res) => {
 // @desc    Get current user's schedule for a specific date (Priority: User > Global)
 // @route   GET /api/schedule/my
 // @access  Private (User)
+// @desc    Get current user's schedule for a specific date (Priority: User > Global)
+// @route   GET /api/schedule/my
+// @access  Private (User)
 const getMySchedule = async (req, res) => {
     try {
         const { date, startDate, endDate } = req.query;
+        // User Premium Status
+        const userIsPremium = req.user.subscription?.plan === 'premium';
 
-        // If Range Request (For 3-Day View)
+        // -------------------------------------------------------------
+        // NEW LOGIC: If Range Request (Frontend asks for 3 days usually)
+        // -------------------------------------------------------------
         if (startDate && endDate) {
             const start = new Date(startDate);
-            start.setHours(0, 0, 0, 0);
+            start.setUTCHours(0, 0, 0, 0);
             const end = new Date(endDate);
-            end.setHours(23, 59, 59, 999);
+            end.setUTCHours(23, 59, 59, 999);
 
+            // Fetch all potentially relevant schedules in one go
             const allSchedules = await Schedule.find({
                 $or: [
-                    { user: req.user._id },
-                    { isGlobal: true }
+                    { user: req.user._id, isGlobal: false }, // Personal
+                    { isGlobal: true } // Global (both Public and Private)
                 ],
                 date: { $gte: start, $lte: end }
-            }).populate('workout').populate('mealPlan');
+            })
+                .populate('workout')
+                .populate('mealPlan')
+                .sort({ date: 1 });
 
             const result = [];
-            const userIsPremium = req.user.subscription?.plan === 'premium';
+            const debugLog = [];
 
-            // Iterate through each day in range
-            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-                const dayStart = new Date(d);
-                dayStart.setHours(0, 0, 0, 0);
-                const dayEnd = new Date(d);
-                dayEnd.setHours(23, 59, 59, 999);
+            // Iterate precisely day by day from start to end
+            // Use a loop that increments the date object
+            let currentLoopDate = new Date(start);
+            while (currentLoopDate <= end) {
+                // Normalize current day range
+                const dayStart = new Date(currentLoopDate);
+                dayStart.setUTCHours(0, 0, 0, 0);
+                const dayEnd = new Date(currentLoopDate);
+                dayEnd.setUTCHours(23, 59, 59, 999);
 
-                // Filter for this day
-                const daySchedules = allSchedules.filter(s => s.date >= dayStart && s.date <= dayEnd);
+                // Find docs for this specific day
+                const dayDocs = allSchedules.filter(s => {
+                    const sDate = new Date(s.date);
+                    return sDate >= dayStart && sDate <= dayEnd;
+                });
 
-                // 1. Specific
-                const specific = daySchedules.find(s => s.user && s.user.toString() === req.user._id.toString());
-                // 2. Global
-                // If Premium: prefer private global (isPublic: false), fallback to public? Usually global private is for premium.
-                // If Free: must be public global (isPublic: true)
+                // Priority Logic:
+                // 1. Specific Personal Assignment
+                let chosenSchedule = dayDocs.find(s => s.user && s.user.toString() === req.user._id.toString());
 
-                let globalSchedule = null;
-                if (userIsPremium) {
-                    // Premium gets "Paid Global" (isPublic=false) OR "Free Global" (isPublic=true) if no specific paid one? 
-                    // Usually premium implies getting the premium track.
-                    globalSchedule = daySchedules.find(s => s.isGlobal && !s.isPublic);
-                } else {
-                    // Free gets Free Global
-                    globalSchedule = daySchedules.find(s => s.isGlobal && s.isPublic);
+                // 2. If no personal, look for Global
+                if (!chosenSchedule) {
+                    if (userIsPremium) {
+                        // Premium User: Prefer "Premium Global" (isPublic=false), fallback to "Free Global" (isPublic=true)
+                        // If there is a specific premium track set by admin (isPublic: false), take it.
+                        chosenSchedule = dayDocs.find(s => s.isGlobal && s.isPublic === false);
+                        if (!chosenSchedule) {
+                            // Fallback to general public
+                            chosenSchedule = dayDocs.find(s => s.isGlobal && s.isPublic === true);
+                        }
+                    } else {
+                        // Free User: Can ONLY see "Free Global" (isPublic=true)
+                        chosenSchedule = dayDocs.find(s => s.isGlobal && s.isPublic === true);
+                    }
                 }
 
-                // Final Selection
-                const finalSchedule = specific || globalSchedule;
+                // Determine Locking Logic
+                // Rule: If Free User -> Tomorrow (Future) is LOCKED.
+                // We need to compare currentLoopDate to Actual "Today" (Server Time)
+                const now = new Date();
+                const todayMidnight = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+                const loopMidnight = new Date(Date.UTC(dayStart.getUTCFullYear(), dayStart.getUTCMonth(), dayStart.getUTCDate()));
 
-                if (finalSchedule) {
-                    result.push(finalSchedule);
-                } else {
-                    // Push placeholder? Or just empty. Frontend probably wants date keys.
-                    // Actually, if we return a list, frontend can map.
-                    // Let's return object with date attached if it's not there, or just the schedule doc.
+                let isLocked = false;
 
-                    // To make it easier for frontend, we can construct a unified object
-                    result.push({
-                        date: dayStart.toISOString(),
-                        workout: finalSchedule?.workout || null,
-                        mealPlan: finalSchedule?.mealPlan || null,
-                        _id: finalSchedule?._id || null
-                    });
+                // If it's tomorrow (future) AND user is NOT premium => LOCKED
+                if (loopMidnight > todayMidnight && !userIsPremium) {
+                    isLocked = true;
                 }
+
+                // Construct Response Object for this Date
+                const payload = {
+                    date: dayStart.toISOString(),
+                    _id: chosenSchedule?._id || null,
+                    workout: null, // Default
+                    mealPlan: null, // Default
+                    status: 'active', // Placeholder
+                    locked: isLocked
+                };
+
+                // If a schedule exists, populate fields
+                if (chosenSchedule) {
+                    // Check Completion Status based on DailyLog?
+                    // The schedule object itself doesn't have 'completed'. 
+                    // Usually we join with DailyLog, but for simplified MVP, let's assume valid data return.
+                    // Frontend will handle completion status separately or we can add it here if we lookup Progress.
+                    // For now, return the workout content.
+
+                    // If LOCKED, we might want to hide details?
+                    // User Request: "if free user then show the tomorroe workout locked... view it only"
+                    // We will return the metadata (title, image) but maybe hide detailed exercises if we want strict security.
+                    // But frontend will handle the "Lock" UI overlay.
+
+                    if (chosenSchedule.workout) {
+                        payload.workout = chosenSchedule.workout;
+                    }
+                    if (chosenSchedule.mealPlan) {
+                        payload.mealPlan = chosenSchedule.mealPlan;
+                    }
+                }
+
+                result.push(payload);
+
+                // Increment Day
+                currentLoopDate.setUTCDate(currentLoopDate.getUTCDate() + 1);
             }
+
             return res.json(result);
         }
 
-        // Single Date Logic (Existing)
+        // -------------------------------------------------------------
+        // FALLBACK: Old Single Date Logic (Backward Compatibility)
+        // -------------------------------------------------------------
         const scheduleDate = date ? new Date(date) : new Date();
-        scheduleDate.setHours(0, 0, 0, 0);
+        scheduleDate.setUTCHours(0, 0, 0, 0);
 
-        // 1. Check for Personal Assignment (Highest Priority)
         let schedule = await Schedule.findOne({
             user: req.user._id,
             date: scheduleDate,
@@ -343,19 +397,15 @@ const getMySchedule = async (req, res) => {
         }).populate('workout').populate('mealPlan');
 
         if (!schedule) {
-            // 2. Check for Global Assignment (Tier based)
-            // Free user -> isPublic: true
-            // Premium user -> isPublic: false
-            const userIsPremium = req.user.subscription?.plan === 'premium';
-
             schedule = await Schedule.findOne({
                 isGlobal: true,
                 date: scheduleDate,
-                isPublic: !userIsPremium // if premium, look for isPublic: false (Private)
+                isPublic: !userIsPremium
             }).populate('workout').populate('mealPlan');
         }
 
         res.json(schedule);
+
     } catch (error) {
         console.error('Get My Schedule Error:', error);
         res.status(500).json({ message: 'Server Error' });
