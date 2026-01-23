@@ -73,11 +73,24 @@ const getUserPaymentHistory = async (req, res) => {
     }
 };
 
+// @desc    Get my payment history
+// @route   GET /api/subscriptions/my-history
+// @access  Private
+const getMyHistory = async (req, res) => {
+    try {
+        const result = await subscriptionService.getUserPaymentHistory(req.user._id, req.query);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     getPlans,
     subscribe,
     createPlan,
     getAdminStats,
     getAdminPaidUsers,
-    getUserPaymentHistory
+    getUserPaymentHistory,
+    getMyHistory
 };
