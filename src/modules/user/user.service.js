@@ -120,7 +120,10 @@ const getHomeData = async (userId) => {
 
     // 1. Get Today's Schedule (Workout & Meal Plan)
     const schedules = await Schedule.find({
-        user: userId,
+        $or: [
+            { user: userId },
+            { isGlobal: true }
+        ],
         date: { $gte: today, $lt: tomorrow }
     }).populate('workout').populate('mealPlan');
 
