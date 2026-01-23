@@ -258,9 +258,80 @@ const deleteSchedule = async (req, res) => {
 // @desc    Get current user's schedule for a specific date (Priority: User > Global)
 // @route   GET /api/schedule/my
 // @access  Private (User)
+// @desc    Get current user's schedule for a specific date (Priority: User > Global)
+// @route   GET /api/schedule/my
+// @access  Private (User)
 const getMySchedule = async (req, res) => {
     try {
-        const { date } = req.query;
+        const { date, startDate, endDate } = req.query;
+
+        // If Range Request (For 3-Day View)
+        if (startDate && endDate) {
+            const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+
+            const allSchedules = await Schedule.find({
+                $or: [
+                    { user: req.user._id },
+                    { isGlobal: true }
+                ],
+                date: { $gte: start, $lte: end }
+            }).populate('workout').populate('mealPlan');
+
+            const result = [];
+            const userIsPremium = req.user.subscription?.plan === 'premium';
+
+            // Iterate through each day in range
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                const dayStart = new Date(d);
+                dayStart.setHours(0, 0, 0, 0);
+                const dayEnd = new Date(d);
+                dayEnd.setHours(23, 59, 59, 999);
+
+                // Filter for this day
+                const daySchedules = allSchedules.filter(s => s.date >= dayStart && s.date <= dayEnd);
+
+                // 1. Specific
+                const specific = daySchedules.find(s => s.user && s.user.toString() === req.user._id.toString());
+                // 2. Global
+                // If Premium: prefer private global (isPublic: false), fallback to public? Usually global private is for premium.
+                // If Free: must be public global (isPublic: true)
+
+                let globalSchedule = null;
+                if (userIsPremium) {
+                    // Premium gets "Paid Global" (isPublic=false) OR "Free Global" (isPublic=true) if no specific paid one? 
+                    // Usually premium implies getting the premium track.
+                    globalSchedule = daySchedules.find(s => s.isGlobal && !s.isPublic);
+                } else {
+                    // Free gets Free Global
+                    globalSchedule = daySchedules.find(s => s.isGlobal && s.isPublic);
+                }
+
+                // Final Selection
+                const finalSchedule = specific || globalSchedule;
+
+                if (finalSchedule) {
+                    result.push(finalSchedule);
+                } else {
+                    // Push placeholder? Or just empty. Frontend probably wants date keys.
+                    // Actually, if we return a list, frontend can map.
+                    // Let's return object with date attached if it's not there, or just the schedule doc.
+
+                    // To make it easier for frontend, we can construct a unified object
+                    result.push({
+                        date: dayStart.toISOString(),
+                        workout: finalSchedule?.workout || null,
+                        mealPlan: finalSchedule?.mealPlan || null,
+                        _id: finalSchedule?._id || null
+                    });
+                }
+            }
+            return res.json(result);
+        }
+
+        // Single Date Logic (Existing)
         const scheduleDate = date ? new Date(date) : new Date();
         scheduleDate.setHours(0, 0, 0, 0);
 
