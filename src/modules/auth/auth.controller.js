@@ -21,6 +21,9 @@ const loginUser = async (req, res) => {
         const user = await authService.login(email, password);
         res.json(user);
     } catch (error) {
+        const fs = require('fs');
+        try { fs.appendFileSync('error.log', `[${new Date().toISOString()}] loginUser Error: ${error.stack}\n`); } catch (e) { }
+        console.error(error);
         res.status(401).json({ message: error.message });
     }
 };

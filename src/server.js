@@ -50,6 +50,17 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/schedule', scheduleRoutes);
 
+// Global Error Handler
+app.use((err, req, res, next) => {
+    const fs = require('fs');
+    try { fs.appendFileSync('error.log', `[${new Date().toISOString()}] Global Error: ${err.stack}\n`); } catch (e) { }
+    console.error(err.stack);
+    res.status(500).json({
+        message: err.message,
+    });
+});
+
+
 const PORT = process.env.PORT || 5000;
 
 if (require.main === module) {

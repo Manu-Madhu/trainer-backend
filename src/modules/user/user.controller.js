@@ -97,6 +97,9 @@ const getHomeData = async (req, res) => {
         const data = await userService.getHomeData(req.user.id);
         res.json(data);
     } catch (error) {
+        const fs = require('fs');
+        try { fs.appendFileSync('error.log', `[${new Date().toISOString()}] getHomeData Error: ${error.stack}\n`); } catch (e) { }
+        console.error(error);
         res.status(500).json({ message: error.message });
     }
 };
