@@ -113,8 +113,25 @@ const getHomeData = async (userId) => {
     const user = await userRepository.findUserById(userId);
     if (!user) throw new Error('User not found');
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // FIX: Force Timezone to India (Asia/Kolkata)
+    // Server might be in UTC. 4 AM IST = 10:30 PM Previous Day UTC.
+    // We must ensure 'today' represents the date in India.
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Kolkata',
+        year: 'numeric',
+        month: 'numeric',
+        day: 'numeric',
+    });
+
+    const parts = formatter.formatToParts(now);
+    const year = parseInt(parts.find(p => p.type === 'year').value);
+    const month = parseInt(parts.find(p => p.type === 'month').value) - 1; // Months are 0-indexed
+    const day = parseInt(parts.find(p => p.type === 'day').value);
+
+    // Create a UTC date for the start of the India day (Midnight)
+    const today = new Date(Date.UTC(year, month, day));
+
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
