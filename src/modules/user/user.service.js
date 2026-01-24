@@ -42,6 +42,26 @@ const getAllUsers = async (query = {}) => {
     return await userRepository.findAllUsers(filter, { skip, limit });
 };
 
+const checkAndExpireSubscription = async (user) => {
+    // Only check if premium and has end date
+    if (user.subscription && user.subscription.plan === 'premium' && user.subscription.endDate) {
+        const now = new Date();
+        const endDate = new Date(user.subscription.endDate);
+
+        // Check if strictly past the end date
+        if (now > endDate && user.subscription.status !== 'expired') {
+            // Update DB
+            await userRepository.updateUser(user._id, {
+                'subscription.status': 'expired'
+            });
+            // Update in-memory object to reflect change immediately
+            user.subscription.status = 'expired';
+            return true;
+        }
+    }
+    return false;
+};
+
 const getUserById = async (userId) => {
     return await userRepository.findUserById(userId);
 };
@@ -227,6 +247,12 @@ const getHomeData = async (userId) => {
         }
     } else {
         subscriptionStatus = 'free';
+    }
+
+    // RESTRICT CONTENT IF EXPIRED
+    if (subscriptionStatus === 'expired') {
+        workoutToday = null;
+        mealPlanToday = null;
     }
 
     return {
