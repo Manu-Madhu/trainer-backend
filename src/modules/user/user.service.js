@@ -200,6 +200,29 @@ const getHomeData = async (userId) => {
         bmi = currentWeight / (heightInM * heightInM);
     }
 
+    // 4. Check Subscription Status
+    let subscriptionStatus = user.subscription?.status || 'inactive';
+    const subEndDate = user.subscription?.endDate ? new Date(user.subscription.endDate) : null;
+    let daysLeft = 0;
+
+    if (user.subscription?.plan === 'premium') {
+        if (subEndDate) {
+            const nowTime = new Date(); // Use actual current time for expiry check, not just date
+            const diffTime = subEndDate.getTime() - nowTime.getTime();
+            daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffTime <= 0) {
+                subscriptionStatus = 'expired';
+            } else if (daysLeft <= 2) {
+                subscriptionStatus = 'expiring_soon';
+            } else {
+                subscriptionStatus = 'active';
+            }
+        }
+    } else {
+        subscriptionStatus = 'free';
+    }
+
     return {
         user,
         stats: {
@@ -207,6 +230,8 @@ const getHomeData = async (userId) => {
             eaten: { current: kcalEaten, target: targetEat },
             bmi: bmi ? parseFloat(bmi.toFixed(1)) : 0
         },
+        subscriptionStatus,
+        daysLeft,
         workoutToday,
         mealPlan: mealPlanToday
     };

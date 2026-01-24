@@ -159,11 +159,78 @@ const getUserPaymentHistory = async (userId, query = {}) => {
     return { history, total };
 };
 
+const getPendingPayments = async (query = {}) => {
+    const { page = 1, limit = 10, search } = query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    let filter = { status: 'pending' };
+
+    // If search is needed, we might need to look up users first or use aggregate
+    // For simplicity, let's just populate user for now
+    const payments = await Payment.find(filter)
+        .populate('user', 'name email phone avatar subscription')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit));
+
+    const total = await Payment.countDocuments(filter);
+
+    return { payments, total };
+};
+
+const approvePayment = async (paymentId) => {
+    const payment = await Payment.findById(paymentId).populate('user');
+    if (!payment) {
+        throw new Error('Payment not found');
+    }
+
+    if (payment.status === 'paid') {
+        throw new Error('Payment already approved');
+    }
+
+    // 1. Mark Payment as Paid
+    payment.status = 'paid';
+    payment.paidAt = new Date();
+    await payment.save();
+
+    // 2. Update User Subscription
+    const user = payment.user;
+    if (!user) throw new Error('User not associated with payment');
+
+    const now = new Date();
+    let startDate = now;
+    let endDate = new Date();
+    endDate.setDate(endDate.getDate() + 30); // 30 days coverage
+
+    // If user is already premium and not expired, extend from existing endDate
+    if (user.subscription && user.subscription.plan === 'premium' && user.subscription.endDate) {
+        const existingEnd = new Date(user.subscription.endDate);
+        if (existingEnd > now) {
+            startDate = user.subscription.startDate || now; // Keep original start
+            existingEnd.setDate(existingEnd.getDate() + 30);
+            endDate = existingEnd;
+        }
+    }
+
+    user.subscription = {
+        plan: 'premium',
+        status: 'active',
+        startDate: startDate,
+        endDate: endDate
+    };
+
+    await user.save();
+
+    return { payment, user };
+};
+
 module.exports = {
     getPlans,
     subscribeUser,
     createPlan,
     getAdminStats,
     getAdminPaidUsers,
-    getUserPaymentHistory
+    getUserPaymentHistory,
+    getPendingPayments,
+    approvePayment
 };
