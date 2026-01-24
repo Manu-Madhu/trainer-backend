@@ -206,8 +206,32 @@ const getHomeData = async (userId) => {
 
     const globalSchedules = schedules.filter(s => s.isGlobal);
 
-    const activeWorkoutSchedule = specificSchedules.find(s => s.workout) || globalSchedules.find(s => s.workout);
-    const activeMealSchedule = specificSchedules.find(s => s.mealPlan) || globalSchedules.find(s => s.mealPlan);
+    // Helper to resolve the correct schedule based on subscription status
+    const resolveSchedule = (type) => {
+        // 1. Try Specific (Personal) - Highest Priority
+        const personal = specificSchedules.find(s => s[type]);
+        if (personal) return personal;
+
+        // 2. Try Global (Fallbacks)
+        const relevantGlobals = globalSchedules.filter(s => s[type]);
+
+        // Scenario A: Premium/Active User
+        // Prefer "Premium Global" (isPublic: false), Fallback to "Free Global" (isPublic: true)
+        if (subscriptionStatus === 'active' || subscriptionStatus === 'expiring_soon') {
+            const premiumGlobal = relevantGlobals.find(s => s.isPublic === false);
+            if (premiumGlobal) return premiumGlobal;
+
+            // Fallback to free global if no premium global exists
+            return relevantGlobals.find(s => s.isPublic === true);
+        }
+
+        // Scenario B: Free/Expired User
+        // Can ONLY see "Free Global" (isPublic: true)
+        return relevantGlobals.find(s => s.isPublic === true);
+    };
+
+    const activeWorkoutSchedule = resolveSchedule('workout');
+    const activeMealSchedule = resolveSchedule('mealPlan');
 
     // 4. Get Daily Log
     const dailyLog = await DailyLog.findOne({
@@ -220,12 +244,12 @@ const getHomeData = async (userId) => {
     let targetBurn = 0;
     let targetEat = 0;
 
-    if (activeWorkoutSchedule) {
+    if (activeWorkoutSchedule?.workout) {
         workoutToday = activeWorkoutSchedule.workout;
         targetBurn = workoutToday.caloriesBurned || 0;
     }
 
-    if (activeMealSchedule) {
+    if (activeMealSchedule?.mealPlan) {
         mealPlanToday = activeMealSchedule.mealPlan;
         if (mealPlanToday.meals) {
             mealPlanToday.meals.forEach(m => {
