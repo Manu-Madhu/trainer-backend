@@ -146,7 +146,31 @@ const getUserPaymentHistory = async (userId, query = {}) => {
     }
 
     if (search) {
-        filter.notes = { $regex: search, $options: 'i' };
+        const searchNumber = parseInt(search);
+        const searchRegex = { $regex: search, $options: 'i' };
+
+        const orConditions = [
+            { notes: searchRegex },
+            { transactionId: searchRegex }
+        ];
+
+        // Search by Year or Month (number)
+        if (!isNaN(searchNumber)) {
+            orConditions.push({ year: searchNumber });
+            if (searchNumber >= 1 && searchNumber <= 12) {
+                orConditions.push({ month: searchNumber });
+            }
+        }
+
+        // Search by Month Name
+        const months = ["january", "february", "march", "april", "may", "june",
+            "july", "august", "september", "october", "november", "december"];
+        const monthIndex = months.findIndex(m => m.startsWith(search.toLowerCase()));
+        if (monthIndex !== -1) {
+            orConditions.push({ month: monthIndex + 1 });
+        }
+
+        filter.$or = orConditions;
     }
 
     const history = await Payment.find(filter)
