@@ -47,6 +47,8 @@ const checkAndExpireSubscription = async (user) => {
     if (user.subscription && user.subscription.plan === 'premium' && user.subscription.endDate) {
         const now = new Date();
         const endDate = new Date(user.subscription.endDate);
+        // Set to end of the day to ensure the subscription is valid for the entire last day
+        endDate.setHours(23, 59, 59, 999);
 
         // Check if strictly past the end date
         if (now > endDate && user.subscription.status !== 'expired') {
@@ -230,6 +232,9 @@ const getHomeData = async (userId) => {
 
     if (user.subscription?.plan === 'premium') {
         if (subEndDate) {
+            // Set End Date to End of Day for fair calculated expiry
+            subEndDate.setHours(23, 59, 59, 999);
+
             const nowTime = new Date(); // Use actual current time for expiry check, not just date
             const diffTime = subEndDate.getTime() - nowTime.getTime();
             daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
