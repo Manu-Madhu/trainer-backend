@@ -294,10 +294,26 @@ const getHomeData = async (userId) => {
 };
 
 const requestPremium = async (userId, screenshotUrl) => {
-    // Check if pending request exists
-    const existing = await Payment.findOne({ user: userId, status: 'pending' });
+    const currentMonth = new Date().getMonth() + 1;
+    const currentYear = new Date().getFullYear();
+
+    // Check if ANY record exists for this month/year to avoid Unique Key collision
+    const existing = await Payment.findOne({
+        user: userId,
+        month: currentMonth,
+        year: currentYear
+    });
+
     if (existing) {
+        if (existing.status === 'paid') {
+            throw new Error('Subscription already active for this month.');
+        }
+
+        // If pending, failed, rejected -> update it to pending with new screenshot
+        // This allows users to retry if their previous one was rejected or if they want to update the screenshot
+        existing.status = 'pending';
         existing.screenshotUrl = screenshotUrl;
+        existing.rejectionReason = undefined; // Clear previous rejection errors
         return await existing.save();
     }
 
@@ -305,8 +321,8 @@ const requestPremium = async (userId, screenshotUrl) => {
         user: userId,
         amount: 300,
         currency: 'INR',
-        month: new Date().getMonth() + 1,
-        year: new Date().getFullYear(),
+        month: currentMonth,
+        year: currentYear,
         status: 'pending',
         method: 'manual_upi',
         screenshotUrl
