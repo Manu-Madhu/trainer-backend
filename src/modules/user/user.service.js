@@ -113,6 +113,9 @@ const getHomeData = async (userId) => {
     const user = await userRepository.findUserById(userId);
     if (!user) throw new Error('User not found');
 
+    // AUTO-UPDATE: Check if subscription expired
+    await checkAndExpireSubscription(user);
+
     // FIX: Force Timezone to India (Asia/Kolkata)
     // Server might be in UTC. 4 AM IST = 10:30 PM Previous Day UTC.
     // We must ensure 'today' represents the date in India.
@@ -215,6 +218,9 @@ const getHomeData = async (userId) => {
                 subscriptionStatus = 'expired';
             } else if (daysLeft <= 2) {
                 subscriptionStatus = 'expiring_soon';
+            } else if (user.subscription.status === 'expired') {
+                // Fallback if checkAndExpireSubscription already set it but dates are weirdly aligned (unlikely with > check)
+                subscriptionStatus = 'expired';
             } else {
                 subscriptionStatus = 'active';
             }
