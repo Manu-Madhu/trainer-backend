@@ -224,6 +224,23 @@ const approvePayment = async (paymentId) => {
     return { payment, user };
 };
 
+const rejectPayment = async (paymentId, reason) => {
+    const payment = await Payment.findById(paymentId);
+    if (!payment) throw new Error('Payment not found');
+
+    if (payment.status !== 'pending') {
+        throw new Error('Can only reject pending payments');
+    }
+
+    payment.status = 'failed'; // or 'rejected' if you add that enum value, but 'failed' works for now or let's stick to schemas
+    // Schema says: enum: ['paid', 'pending', 'failed', 'refunded']
+    // Let's use 'failed' effectively meaning rejected here
+    payment.rejectionReason = reason;
+    await payment.save();
+
+    return payment;
+};
+
 module.exports = {
     getPlans,
     subscribeUser,
@@ -232,5 +249,6 @@ module.exports = {
     getAdminPaidUsers,
     getUserPaymentHistory,
     getPendingPayments,
-    approvePayment
+    approvePayment,
+    rejectPayment
 };

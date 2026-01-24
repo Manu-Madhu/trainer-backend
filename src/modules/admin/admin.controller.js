@@ -58,8 +58,22 @@ const approvePayment = async (req, res) => {
     }
 };
 
+// @desc    Reject Payment
+// @route   PUT /api/admin/payments/:id/reject
+// @access  Private/Admin
+const rejectPayment = async (req, res) => {
+    try {
+        const { reason } = req.body;
+        const result = await subscriptionService.rejectPayment(req.params.id, reason);
+        res.json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
 module.exports = {
     getAdminStats,
     getPendingPayments,
-    approvePayment
+    approvePayment,
+    rejectPayment
 };
