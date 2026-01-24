@@ -138,9 +138,35 @@ const getHomeData = async (userId) => {
     // AUTO-UPDATE: Check if subscription expired
     await checkAndExpireSubscription(user);
 
+    // 1. Determine Subscription Status FIRST (to decide data visibility)
+    let subscriptionStatus = user.subscription?.status || 'inactive';
+    const subEndDate = user.subscription?.endDate ? new Date(user.subscription.endDate) : null;
+    let daysLeft = 0;
+
+    if (user.subscription?.plan === 'premium') {
+        if (subEndDate) {
+            // Set End Date to End of Day for fair calculated expiry
+            subEndDate.setHours(23, 59, 59, 999);
+
+            const nowTime = new Date(); // Use actual current time for expiry check
+            const diffTime = subEndDate.getTime() - nowTime.getTime();
+            daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffTime <= 0) {
+                subscriptionStatus = 'expired';
+            } else if (daysLeft <= 2) {
+                subscriptionStatus = 'expiring_soon';
+            } else if (user.subscription.status === 'expired') {
+                subscriptionStatus = 'expired';
+            } else {
+                subscriptionStatus = 'active';
+            }
+        }
+    } else {
+        subscriptionStatus = 'free';
+    }
+
     // FIX: Force Timezone to India (Asia/Kolkata)
-    // Server might be in UTC. 4 AM IST = 10:30 PM Previous Day UTC.
-    // We must ensure 'today' represents the date in India.
     const now = new Date();
     const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone: 'Asia/Kolkata',
@@ -151,16 +177,15 @@ const getHomeData = async (userId) => {
 
     const parts = formatter.formatToParts(now);
     const year = parseInt(parts.find(p => p.type === 'year').value);
-    const month = parseInt(parts.find(p => p.type === 'month').value) - 1; // Months are 0-indexed
+    const month = parseInt(parts.find(p => p.type === 'month').value) - 1;
     const day = parseInt(parts.find(p => p.type === 'day').value);
 
     // Create a UTC date for the start of the India day (Midnight)
     const today = new Date(Date.UTC(year, month, day));
-
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    // 1. Get Today's Schedule (Workout & Meal Plan)
+    // 2. Get Today's Schedule (Workout & Meal Plan)
     const schedules = await Schedule.find({
         $or: [
             { user: userId },
@@ -172,14 +197,19 @@ const getHomeData = async (userId) => {
     let workoutToday = null;
     let mealPlanToday = null;
 
-    // 2. Prioritize Assignments (User Specific > Global)
-    const specificSchedules = schedules.filter(s => s.user && s.user.toString() === userId.toString());
+    // 3. Prioritize Assignments (If Expired -> Users get GLOBAL/Free data only)
+    const useSpecific = subscriptionStatus !== 'expired';
+
+    const specificSchedules = useSpecific
+        ? schedules.filter(s => s.user && s.user.toString() === userId.toString())
+        : [];
+
     const globalSchedules = schedules.filter(s => s.isGlobal);
 
     const activeWorkoutSchedule = specificSchedules.find(s => s.workout) || globalSchedules.find(s => s.workout);
     const activeMealSchedule = specificSchedules.find(s => s.mealPlan) || globalSchedules.find(s => s.mealPlan);
 
-    // 3. Get Daily Log
+    // 4. Get Daily Log
     const dailyLog = await DailyLog.findOne({
         user: userId,
         date: { $gte: today, $lt: tomorrow }
@@ -212,7 +242,7 @@ const getHomeData = async (userId) => {
         kcalEaten = targetEat;
     }
 
-    // 3. Get BMI
+    // 5. Get BMI
     const lastProgress = await Progress.findOne({ user: userId }).sort({ date: -1 });
     let currentWeight = user.currentWeight;
     if (lastProgress && lastProgress.weight) {
@@ -223,41 +253,6 @@ const getHomeData = async (userId) => {
     if (user.height && currentWeight) {
         const heightInM = user.height / 100;
         bmi = currentWeight / (heightInM * heightInM);
-    }
-
-    // 4. Check Subscription Status
-    let subscriptionStatus = user.subscription?.status || 'inactive';
-    const subEndDate = user.subscription?.endDate ? new Date(user.subscription.endDate) : null;
-    let daysLeft = 0;
-
-    if (user.subscription?.plan === 'premium') {
-        if (subEndDate) {
-            // Set End Date to End of Day for fair calculated expiry
-            subEndDate.setHours(23, 59, 59, 999);
-
-            const nowTime = new Date(); // Use actual current time for expiry check, not just date
-            const diffTime = subEndDate.getTime() - nowTime.getTime();
-            daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-            if (diffTime <= 0) {
-                subscriptionStatus = 'expired';
-            } else if (daysLeft <= 2) {
-                subscriptionStatus = 'expiring_soon';
-            } else if (user.subscription.status === 'expired') {
-                // Fallback if checkAndExpireSubscription already set it but dates are weirdly aligned (unlikely with > check)
-                subscriptionStatus = 'expired';
-            } else {
-                subscriptionStatus = 'active';
-            }
-        }
-    } else {
-        subscriptionStatus = 'free';
-    }
-
-    // RESTRICT CONTENT IF EXPIRED
-    if (subscriptionStatus === 'expired') {
-        workoutToday = null;
-        mealPlanToday = null;
     }
 
     return {
