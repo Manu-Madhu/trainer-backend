@@ -15,6 +15,12 @@ const protect = async (req, res, next) => {
 
             req.user = await User.findById(decoded.id).select('-password');
 
+            // Check and update subscription status if expired
+            const { checkAndExpireSubscription } = require('../modules/user/user.service');
+            if (req.user) {
+                await checkAndExpireSubscription(req.user);
+            }
+
             next();
         } catch (error) {
             console.error(error);

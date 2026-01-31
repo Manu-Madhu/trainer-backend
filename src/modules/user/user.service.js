@@ -339,5 +339,6 @@ module.exports = {
     deleteUser,
     updateUser,
     getHomeData,
-    requestPremium
+    requestPremium,
+    checkAndExpireSubscription
 };

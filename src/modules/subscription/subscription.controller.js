@@ -85,6 +85,45 @@ const getMyHistory = async (req, res) => {
     }
 };
 
+
+
+// @desc    Get pending payments (Admin)
+// @route   GET /api/subscriptions/admin/pending
+// @access  Private (Admin)
+const getPendingPayments = async (req, res) => {
+    try {
+        const result = await subscriptionService.getPendingPayments(req.query);
+        res.json(result);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Approve payment (Admin)
+// @route   PUT /api/subscriptions/admin/approve/:id
+// @access  Private (Admin)
+const approvePayment = async (req, res) => {
+    try {
+        const result = await subscriptionService.approvePayment(req.params.id);
+        res.json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+// @desc    Reject payment (Admin)
+// @route   PUT /api/subscriptions/admin/reject/:id
+// @access  Private (Admin)
+const rejectPayment = async (req, res) => {
+    try {
+        const { reason } = req.body;
+        const result = await subscriptionService.rejectPayment(req.params.id, reason);
+        res.json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
 module.exports = {
     getPlans,
     subscribe,
@@ -92,5 +131,8 @@ module.exports = {
     getAdminStats,
     getAdminPaidUsers,
     getUserPaymentHistory,
-    getMyHistory
+    getMyHistory,
+    getPendingPayments,
+    approvePayment,
+    rejectPayment
 };

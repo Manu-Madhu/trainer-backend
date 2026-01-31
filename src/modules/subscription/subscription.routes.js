@@ -12,5 +12,8 @@ router.get('/admin/stats', protect, admin, subscriptionController.getAdminStats)
 router.get('/admin/users', protect, admin, subscriptionController.getAdminPaidUsers);
 router.get('/history/:userId', protect, admin, subscriptionController.getUserPaymentHistory);
 router.get('/my-history', protect, subscriptionController.getMyHistory);
+router.get('/admin/pending', protect, admin, subscriptionController.getPendingPayments);
+router.put('/admin/approve/:id', protect, admin, subscriptionController.approvePayment);
+router.put('/admin/reject/:id', protect, admin, subscriptionController.rejectPayment);
 
 module.exports = router;
