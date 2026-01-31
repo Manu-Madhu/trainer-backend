@@ -246,14 +246,20 @@ const getHomeData = async (userId) => {
 
     if (activeWorkoutSchedule?.workout) {
         workoutToday = activeWorkoutSchedule.workout;
-        targetBurn = workoutToday.caloriesBurned || 0;
+        targetBurn = workoutToday.caloriesBurned || (workoutToday.calories ? parseFloat(workoutToday.calories) : 0);
     }
 
     if (activeMealSchedule?.mealPlan) {
         mealPlanToday = activeMealSchedule.mealPlan;
         if (mealPlanToday.meals) {
             mealPlanToday.meals.forEach(m => {
-                if (m.totalCalories) targetEat += m.totalCalories;
+                // Check explicit 'calories' or 'totalCalories'
+                let cal = m.totalCalories || (m.calories ? parseFloat(m.calories) : 0);
+                // Fallback to items sum if 0
+                if (!cal && m.items && m.items.length > 0) {
+                    cal = m.items.reduce((sum, i) => sum + (i.calories || 0), 0);
+                }
+                targetEat += cal;
             });
         }
     }
