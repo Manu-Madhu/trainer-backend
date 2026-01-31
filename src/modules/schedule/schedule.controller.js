@@ -311,74 +311,48 @@ const getMySchedule = async (req, res) => {
                     return sDate >= dayStart && sDate <= dayEnd;
                 });
 
-                // Priority Logic:
-                // 1. Specific Personal Assignment
-                let chosenSchedule = dayDocs.find(s => s.user && s.user.toString() === req.user._id.toString());
+                // Helper to resolve a specific plan type (workout or mealPlan)
+                const resolvePlan = (type) => {
+                    // 1. Personal Assignment (Highest Priority)
+                    let schedule = dayDocs.find(s => s.user && s.user.toString() === req.user._id.toString() && s[type]);
+                    if (schedule) return schedule;
 
-                // 2. If no personal, look for Global
-                if (!chosenSchedule) {
+                    // 2. Global Assignment
                     if (userIsPremium) {
-                        // Premium User: Prefer "Premium Global" (isPublic=false), fallback to "Free Global" (isPublic=true)
-                        // If there is a specific premium track set by admin (isPublic: false), take it.
-                        chosenSchedule = dayDocs.find(s => s.isGlobal && s.isPublic === false);
-                        if (!chosenSchedule) {
-                            // Fallback to general public
-                            chosenSchedule = dayDocs.find(s => s.isGlobal && s.isPublic === true);
-                        }
+                        // Premium User: Try Premium Global first
+                        schedule = dayDocs.find(s => s.isGlobal && s.isPublic === false && s[type]);
+                        if (schedule) return schedule;
+                        // Fallback to Free Global
+                        return dayDocs.find(s => s.isGlobal && s.isPublic === true && s[type]);
                     } else {
-                        // Free User: Can ONLY see "Free Global" (isPublic=true)
-                        chosenSchedule = dayDocs.find(s => s.isGlobal && s.isPublic === true);
+                        // Free User: Only Public Global
+                        return dayDocs.find(s => s.isGlobal && s.isPublic === true && s[type]);
                     }
-                }
+                };
+
+                const workoutSchedule = resolvePlan('workout');
+                const mealSchedule = resolvePlan('mealPlan');
 
                 // Determine Locking Logic
-                // Rule: If Free User -> Tomorrow (Future) is LOCKED.
-                // We need to compare currentLoopDate to Actual "Today" (Server Time)
                 const now = new Date();
                 const todayMidnight = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
                 const loopMidnight = new Date(Date.UTC(dayStart.getUTCFullYear(), dayStart.getUTCMonth(), dayStart.getUTCDate()));
 
                 let isLocked = false;
-
-                // If it's tomorrow (future) AND user is NOT premium => LOCKED
                 if (loopMidnight > todayMidnight && !userIsPremium) {
                     isLocked = true;
                 }
 
-                // Construct Response Object for this Date
                 const payload = {
                     date: dayStart.toISOString(),
-                    _id: chosenSchedule?._id || null,
-                    workout: null, // Default
-                    mealPlan: null, // Default
-                    status: 'active', // Placeholder
+                    _id: workoutSchedule?._id || mealSchedule?._id || null,
+                    workout: workoutSchedule?.workout || null,
+                    mealPlan: mealSchedule?.mealPlan || null,
+                    status: 'active',
                     locked: isLocked
                 };
 
-                // If a schedule exists, populate fields
-                if (chosenSchedule) {
-                    // Check Completion Status based on DailyLog?
-                    // The schedule object itself doesn't have 'completed'. 
-                    // Usually we join with DailyLog, but for simplified MVP, let's assume valid data return.
-                    // Frontend will handle completion status separately or we can add it here if we lookup Progress.
-                    // For now, return the workout content.
-
-                    // If LOCKED, we might want to hide details?
-                    // User Request: "if free user then show the tomorroe workout locked... view it only"
-                    // We will return the metadata (title, image) but maybe hide detailed exercises if we want strict security.
-                    // But frontend will handle the "Lock" UI overlay.
-
-                    if (chosenSchedule.workout) {
-                        payload.workout = chosenSchedule.workout;
-                    }
-                    if (chosenSchedule.mealPlan) {
-                        payload.mealPlan = chosenSchedule.mealPlan;
-                    }
-                }
-
                 result.push(payload);
-
-                // Increment Day
                 currentLoopDate.setUTCDate(currentLoopDate.getUTCDate() + 1);
             }
 
@@ -391,21 +365,42 @@ const getMySchedule = async (req, res) => {
         const scheduleDate = date ? new Date(date) : new Date();
         scheduleDate.setUTCHours(0, 0, 0, 0);
 
-        let schedule = await Schedule.findOne({
-            user: req.user._id,
-            date: scheduleDate,
-            isGlobal: false
+        const dayStart = new Date(scheduleDate);
+        const dayEnd = new Date(scheduleDate);
+        dayEnd.setUTCHours(23, 59, 59, 999);
+
+        const dayDocs = await Schedule.find({
+            $or: [
+                { user: req.user._id, isGlobal: false },
+                { isGlobal: true }
+            ],
+            date: { $gte: dayStart, $lte: dayEnd }
         }).populate('workout').populate('mealPlan');
 
-        if (!schedule) {
-            schedule = await Schedule.findOne({
-                isGlobal: true,
-                date: scheduleDate,
-                isPublic: !userIsPremium
-            }).populate('workout').populate('mealPlan');
-        }
+        const resolvePlan = (type) => {
+            let s = dayDocs.find(d => d.user && d.user.toString() === req.user._id.toString() && d[type]);
+            if (s) return s;
+            if (userIsPremium) {
+                s = dayDocs.find(d => d.isGlobal && d.isPublic === false && d[type]);
+                if (s) return s;
+                return dayDocs.find(d => d.isGlobal && d.isPublic === true && d[type]);
+            } else {
+                return dayDocs.find(d => d.isGlobal && d.isPublic === true && d[type]);
+            }
+        };
 
-        res.json(schedule);
+        const workoutS = resolvePlan('workout');
+        const mealS = resolvePlan('mealPlan');
+
+        if (!workoutS && !mealS) return res.json(null);
+
+        res.json({
+            _id: workoutS?._id || mealS?._id,
+            workout: workoutS?.workout || null,
+            mealPlan: mealS?.mealPlan || null,
+            date: scheduleDate,
+            isGlobal: workoutS?.isGlobal || mealS?.isGlobal
+        });
 
     } catch (error) {
         console.error('Get My Schedule Error:', error);
