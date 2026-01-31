@@ -414,45 +414,46 @@ const getMySchedule = async (req, res) => {
 const getWorkoutAssignments = async (req, res) => {
     try {
         const { workoutId } = req.params;
-        const { page = 1, limit = 5, search, from, to } = req.query;
+        const { page = 1, limit = 5, search, from, to, type } = req.query; // type: 'user' (default) | 'global'
 
         const skip = (parseInt(page) - 1) * parseInt(limit);
+        const isGlobalSearch = type === 'global';
 
-        let pipeline = [
-            {
-                $match: {
-                    workout: new mongoose.Types.ObjectId(workoutId),
-                    isGlobal: false
-                }
-            }
-        ];
+        let matchStage = {
+            workout: new mongoose.Types.ObjectId(workoutId),
+            isGlobal: isGlobalSearch
+        };
 
         // Date Filter
         if (from || to) {
             let dateMatch = {};
             if (from) dateMatch.$gte = new Date(from);
             if (to) dateMatch.$lte = new Date(to);
-            pipeline.push({ $match: { date: dateMatch } });
+            matchStage.date = dateMatch;
         }
 
-        // Lookup user details
-        pipeline.push({
-            $lookup: {
-                from: 'users',
-                localField: 'user',
-                foreignField: '_id',
-                as: 'user'
-            }
-        });
-        pipeline.push({ $unwind: '$user' });
+        let pipeline = [{ $match: matchStage }];
 
-        // Search Filter (by User Name)
-        if (search) {
+        // Only do user lookup if NOT global
+        if (!isGlobalSearch) {
             pipeline.push({
-                $match: {
-                    'user.name': { $regex: search, $options: 'i' }
+                $lookup: {
+                    from: 'users',
+                    localField: 'user',
+                    foreignField: '_id',
+                    as: 'user'
                 }
             });
+            pipeline.push({ $unwind: '$user' });
+
+            // Search Filter (by User Name) - only relevant for user assignments
+            if (search) {
+                pipeline.push({
+                    $match: {
+                        'user.name': { $regex: search, $options: 'i' }
+                    }
+                });
+            }
         }
 
         // Get total count BEFORE skip/limit
