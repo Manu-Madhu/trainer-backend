@@ -7,7 +7,14 @@ const logProgress = async (data, userId) => {
         ...data,
         user: userId
     });
-    return await progress.save();
+    const savedProgress = await progress.save();
+
+    // Update User's current weight if provided
+    if (data.weight) {
+        await User.findByIdAndUpdate(userId, { currentWeight: data.weight });
+    }
+
+    return savedProgress;
 };
 
 const getProgressHistory = async (userId) => {
