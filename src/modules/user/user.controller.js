@@ -123,6 +123,7 @@ const requestPremium = async (req, res) => {
         const result = await userService.requestPremium(req.user.id, screenshotUrl);
         res.json(result);
     } catch (error) {
+        console.error("Request Premium Error:", error);
         res.status(500).json({ message: error.message });
     }
 };
