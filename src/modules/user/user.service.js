@@ -285,12 +285,24 @@ const getHomeData = async (userId) => {
         bmi = currentWeight / (heightInM * heightInM);
     }
 
+    // 5a. Calculate Active Days & Total Workouts
+    const createdAt = new Date(user.createdAt);
+    const diffTime = Math.abs(now - createdAt);
+    const daysActive = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    const totalWorkouts = await DailyLog.countDocuments({
+        user: userId,
+        workoutCompleted: true
+    });
+
     return {
         user,
         stats: {
             burned: { current: kcalBurned, target: targetBurn },
             eaten: { current: kcalEaten, target: targetEat },
-            bmi: bmi ? parseFloat(bmi.toFixed(1)) : 0
+            bmi: bmi ? parseFloat(bmi.toFixed(1)) : 0,
+            daysActive: daysActive || 1, // Minimum 1 day
+            totalWorkouts: totalWorkouts || 0
         },
         subscriptionStatus,
         daysLeft,
