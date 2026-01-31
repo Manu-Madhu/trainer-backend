@@ -23,6 +23,7 @@ const getAdminStats = async (req, res) => {
             users: totalUsers,
             trainers: totalTrainers,
             revenue,
+            premiumUsers: totalPremiumUsers,
             recentUsers
         });
     } catch (error) {
