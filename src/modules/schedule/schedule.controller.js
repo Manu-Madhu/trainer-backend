@@ -268,7 +268,8 @@ const getMySchedule = async (req, res) => {
     try {
         const { date, startDate, endDate } = req.query;
         // User Premium Status
-        const userIsPremium = req.user.subscription?.plan === 'premium';
+        // Must be premium plan AND active (not expired)
+        const userIsPremium = req.user.subscription?.plan === 'premium' && req.user.subscription?.status !== 'expired';
 
         // -------------------------------------------------------------
         // NEW LOGIC: If Range Request (Frontend asks for 3 days usually)

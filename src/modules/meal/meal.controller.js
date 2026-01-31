@@ -29,7 +29,7 @@ const getMealPlans = async (req, res) => {
 // @access  Private (User)
 const getMyMealPlans = async (req, res) => {
     try {
-        const mealPlans = await mealService.getMyMealPlans(req.user._id);
+        const mealPlans = await mealService.getMyMealPlans(req.user);
         res.json(mealPlans);
     } catch (error) {
         res.status(500).json({ message: error.message });

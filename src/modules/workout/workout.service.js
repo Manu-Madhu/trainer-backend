@@ -62,8 +62,17 @@ const deleteWorkout = async (id) => {
     return await Workout.findByIdAndDelete(id);
 };
 
-const getMyWorkouts = async (userId) => {
-    // Return workouts assigned to user OR public workouts
+const getMyWorkouts = async (user) => {
+    // If user is just an ID (backward compatibility or from other calls), wrap it
+    const userId = user._id || user;
+    const isExpired = user.subscription && user.subscription.status === 'expired';
+
+    if (isExpired) {
+        // EXPIRED USERS: Can ONLY see Public Workouts
+        return await Workout.find({ isPublic: true });
+    }
+
+    // ACTIVE USERS: Assigned OR Public
     return await Workout.find({
         $or: [
             { assignedTo: userId },

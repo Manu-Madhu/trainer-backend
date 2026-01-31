@@ -55,7 +55,17 @@ const deleteMealPlan = async (id) => {
     return await MealPlan.findByIdAndDelete(id);
 };
 
-const getMyMealPlans = async (userId) => {
+const getMyMealPlans = async (user) => {
+    const userId = user._id || user;
+    const isExpired = user.subscription && user.subscription.status === 'expired';
+
+    if (isExpired) {
+        // EXPIRED USERS: Only Public Meals (if any) or nothing.
+        // Assuming we want to show public meals if they exist, or empty array if we don't have public meals concept fully active yet.
+        // Let's copy Workout logic: try finding Public ones.
+        return await MealPlan.find({ isPublic: true });
+    }
+
     return await MealPlan.find({ assignedTo: userId });
 };
 
