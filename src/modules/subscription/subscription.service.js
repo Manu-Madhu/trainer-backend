@@ -1,6 +1,7 @@
 const SubscriptionPlan = require('./subscription.model');
 const User = require('../user/user.model');
 const Payment = require('./payment.model');
+const Settings = require('../settings/settings.model');
 
 const getPlans = async () => {
     return await SubscriptionPlan.find({ isActive: true });
@@ -48,6 +49,12 @@ const getAdminStats = async () => {
     const now = new Date();
     const currentMonth = now.getMonth() + 1;
     const currentYear = now.getFullYear();
+
+    // Sync pending payments with current settings price if changed
+    const settings = await Settings.findOne({ type: 'payment_config' });
+    if (settings) {
+        await Payment.updateMany({ status: 'pending' }, { amount: settings.amount });
+    }
 
     // 1. Total Earnings (Status: paid)
     const totalEarning = await Payment.aggregate([

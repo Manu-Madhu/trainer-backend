@@ -3,6 +3,7 @@ const Schedule = require('../schedule/schedule.model');
 const DailyLog = require('../progress/dailyLog.model');
 const Progress = require('../progress/progress.model');
 const Payment = require('../subscription/payment.model');
+const Settings = require('../settings/settings.model');
 const bcrypt = require('bcryptjs');
 const sendEmail = require('../../utils/sendEmail');
 const { getWelcomeEmailTemplate } = require('../../utils/emailTemplates');
@@ -316,6 +317,10 @@ const requestPremium = async (userId, screenshotUrl) => {
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
 
+    // Fetch dynamic amount from settings
+    const settings = await Settings.findOne({ type: 'payment_config' });
+    const currentAmount = settings ? settings.amount : 500;
+
     // Check if ANY record exists for this month/year to avoid Unique Key collision
     const existing = await Payment.findOne({
         user: userId,
@@ -344,6 +349,7 @@ const requestPremium = async (userId, screenshotUrl) => {
         // If pending, failed, rejected OR (paid but expired) -> update it to pending with new screenshot
         // This allows users to retry if their previous one was rejected or if they want to update the screenshot
         existing.status = 'pending';
+        existing.amount = currentAmount; // Update to current price if renewing/retrying
         existing.screenshotUrl = screenshotUrl;
         existing.rejectionReason = undefined; // Clear previous rejection errors
         return await existing.save();
@@ -351,7 +357,7 @@ const requestPremium = async (userId, screenshotUrl) => {
 
     const payment = await Payment.create({
         user: userId,
-        amount: 300,
+        amount: currentAmount,
         currency: 'INR',
         month: currentMonth,
         year: currentYear,
