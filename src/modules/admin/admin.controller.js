@@ -100,7 +100,7 @@ const getAnalytics = async (req, res) => {
                     free: {
                         $sum: {
                             $cond: [
-                                { $or: [{ $eq: ["$subscription.plan", "free"] }, { $ifNull: ["$subscription.plan", true] }] }, // Count null/missing as free
+                                { $eq: [{ $ifNull: ["$subscription.plan", "free"] }, "free"] },
                                 1,
                                 0
                             ]
