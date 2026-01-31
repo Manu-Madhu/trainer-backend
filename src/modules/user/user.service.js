@@ -294,6 +294,7 @@ const getHomeData = async (userId) => {
 };
 
 const requestPremium = async (userId, screenshotUrl) => {
+    const user = await userRepository.findUserById(userId);
     const currentMonth = new Date().getMonth() + 1;
     const currentYear = new Date().getFullYear();
 
@@ -306,10 +307,23 @@ const requestPremium = async (userId, screenshotUrl) => {
 
     if (existing) {
         if (existing.status === 'paid') {
-            throw new Error('Subscription already active for this month.');
+            // Check if user is actually active. If expired, allow re-payment (renewal) by reusing the record.
+            const isActive = user.subscription &&
+                user.subscription.plan === 'premium' &&
+                user.subscription.status !== 'expired';
+
+            // Also checking date validity to be safe, though status should cover it if checkAndExpireSubscription ran
+            const now = new Date();
+            const endDate = user.subscription?.endDate ? new Date(user.subscription.endDate) : null;
+            const isDateValid = endDate && endDate > now;
+
+            if (isActive && isDateValid) {
+                throw new Error('Subscription already active for this month.');
+            }
+            // If expired, fall through to update logic below (resetting to pending)
         }
 
-        // If pending, failed, rejected -> update it to pending with new screenshot
+        // If pending, failed, rejected OR (paid but expired) -> update it to pending with new screenshot
         // This allows users to retry if their previous one was rejected or if they want to update the screenshot
         existing.status = 'pending';
         existing.screenshotUrl = screenshotUrl;
