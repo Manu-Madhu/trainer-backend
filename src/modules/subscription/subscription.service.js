@@ -223,16 +223,27 @@ const approvePayment = async (paymentId) => {
 
     const now = new Date();
     let startDate = now;
-    let endDate = new Date();
-    endDate.setDate(endDate.getDate() + 30); // 30 days coverage
+    let endDate = new Date(now);
+
+    // Helper to add 1 month safely
+    const addOneMonth = (date) => {
+        const d = new Date(date);
+        const originalDay = d.getDate();
+        d.setMonth(d.getMonth() + 1);
+        if (d.getDate() !== originalDay) {
+            d.setDate(0); // Snap to last day of previous month (which is the intended month)
+        }
+        return d;
+    };
+
+    endDate = addOneMonth(startDate);
 
     // If user is already premium and not expired, extend from existing endDate
     if (user.subscription && user.subscription.plan === 'premium' && user.subscription.endDate) {
         const existingEnd = new Date(user.subscription.endDate);
         if (existingEnd > now) {
             startDate = user.subscription.startDate || now; // Keep original start
-            existingEnd.setDate(existingEnd.getDate() + 30);
-            endDate = existingEnd;
+            endDate = addOneMonth(existingEnd);
         }
     }
 
