@@ -71,9 +71,53 @@ const rejectPayment = async (req, res) => {
     }
 };
 
+// @desc    Get Admin Analytics (Graph data)
+// @route   GET /api/admin/analytics
+// @access  Private/Admin
+const getAnalytics = async (req, res) => {
+    try {
+        const { months = 6 } = req.query;
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - (parseInt(months) - 1));
+        startDate.setDate(1);
+        startDate.setHours(0, 0, 0, 0);
+
+        const analytics = await User.aggregate([
+            {
+                $match: {
+                    role: 'user',
+                    createdAt: { $gte: startDate, $lte: endDate }
+                }
+            },
+            {
+                $group: {
+                    _id: {
+                        year: { $year: "$createdAt" },
+                        month: { $month: "$createdAt" }
+                    },
+                    total: { $sum: 1 },
+                    free: {
+                        $sum: { $cond: [{ $eq: ["$subscription.plan", "free"] }, 1, 0] }
+                    },
+                    premium: {
+                        $sum: { $cond: [{ $eq: ["$subscription.plan", "premium"] }, 1, 0] }
+                    }
+                }
+            },
+            { $sort: { "_id.year": 1, "_id.month": 1 } }
+        ]);
+
+        res.json(analytics);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     getAdminStats,
     getPendingPayments,
     approvePayment,
-    rejectPayment
+    rejectPayment,
+    getAnalytics
 };
