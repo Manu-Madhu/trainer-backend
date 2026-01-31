@@ -256,6 +256,11 @@ const approvePayment = async (paymentId) => {
 
     await user.save();
 
+    // Update Payment Record with the coverage period
+    payment.startDate = startDate;
+    payment.endDate = endDate;
+    await payment.save();
+
     return { payment, user };
 };
 
