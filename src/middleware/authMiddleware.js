@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../modules/user/user.model');
+const { checkAndExpireSubscription } = require('../modules/user/user.service');
 
 const protect = async (req, res, next) => {
     let token;
@@ -15,9 +16,19 @@ const protect = async (req, res, next) => {
 
             req.user = await User.findById(decoded.id).select('-password');
 
-            // Check and update subscription status if expired
-            const { checkAndExpireSubscription } = require('../modules/user/user.service');
-            if (req.user) {
+            if (!req.user) {
+                return res.status(401).json({ message: 'Not authorized, user not found' });
+            }
+
+            // OPTIMIZED: Only check expiration if user is currently active/premium
+            // This prevents unnecessary service calls for Free users or already Expired users
+            if (req.user.subscription &&
+                req.user.subscription.plan === 'premium' &&
+                req.user.subscription.status === 'active' &&
+                req.user.subscription.endDate) {
+
+                // We await this because if they ARE expired, we want effectively 'instant' block 
+                // for subsequent middleware that might rely on status
                 await checkAndExpireSubscription(req.user);
             }
 

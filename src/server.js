@@ -53,9 +53,13 @@ app.use('/api/schedule', scheduleRoutes);
 app.use('/api/settings', settingsRoutes);
 
 // Global Error Handler
-app.use((err, req, res, next) => {
-    const fs = require('fs');
-    try { fs.appendFileSync('error.log', `[${new Date().toISOString()}] Global Error: ${err.stack}\n`); } catch (e) { }
+app.use(async (err, req, res, next) => {
+    const fs = require('fs').promises;
+    try {
+        await fs.appendFile('error.log', `[${new Date().toISOString()}] Global Error: ${err.stack}\n`);
+    } catch (e) {
+        console.error('Failed to write to error log:', e);
+    }
     console.error(err.stack);
     res.status(500).json({
         message: err.message,
