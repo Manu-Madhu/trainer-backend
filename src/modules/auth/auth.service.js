@@ -1,8 +1,9 @@
 const User = require('../user/user.model');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const sendEmail = require('../../utils/sendEmail');
-const { getOtpEmailTemplate } = require('../../utils/emailTemplates');
+const { getOtpEmailTemplate, getResetPasswordEmailTemplate } = require('../../utils/emailTemplates');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -178,28 +179,59 @@ const verifyOtp = async (email, otp) => {
 const forgotPassword = async (email) => {
     const user = await User.findOne({ email });
     if (!user) {
-        throw new Error('User not found');
+        throw new Error('User with this email does not exist.');
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpires = Date.now() + 10 * 60 * 1000; // 10 mins
+    // Generate a secure random token
+    const token = crypto.randomBytes(32).toString('hex');
+    const tokenExpires = Date.now() + 10 * 60 * 1000; // 10 mins
 
-    user.otp = otp;
-    user.otpExpires = otpExpires;
+    user.otp = token; // Resuing otp field for reset token
+    user.otpExpires = tokenExpires;
     await user.save();
 
-    console.log(`Reset Password OTP for ${email}: ${otp}`);
+    // Construct the reset URL
+    // Use MAIN_DOMAIN or BASE_URL from env, default to local
+    const baseUrl = process.env.BASE_URL || 'http://localhost:5000';
+    const resetUrl = `${baseUrl}/api/auth/reset-password?token=${token}&email=${email}`;
 
-    return { message: 'OTP sent to email for password reset' };
+    console.log(`Reset Password Link for ${email}: ${resetUrl}`);
+
+    try {
+        const message = getResetPasswordEmailTemplate(resetUrl);
+        await sendEmail({
+            email: user.email,
+            subject: 'Trainer - Password Reset Request',
+            message
+        });
+        return { message: 'Password reset link sent to your email.' };
+    } catch (error) {
+        user.otp = undefined;
+        user.otpExpires = undefined;
+        await user.save();
+        throw new Error('Email could not be sent. Please try again later.');
+    }
 };
 
-const resetPassword = async (email, otp, newPassword) => {
+const verifyResetToken = async (email, token) => {
+    const user = await User.findOne({ email });
+    if (!user) {
+        throw new Error('User not found'); // Or 'Invalid link'
+    }
+
+    if (user.otp === token && user.otpExpires > Date.now()) {
+        return true;
+    }
+    return false;
+};
+
+const resetPassword = async (email, token, newPassword) => {
     const user = await User.findOne({ email });
     if (!user) {
         throw new Error('User not found');
     }
 
-    if (user.otp === otp && user.otpExpires > Date.now()) {
+    if (user.otp === token && user.otpExpires > Date.now()) {
         const salt = await bcrypt.genSalt(10);
         user.password = await bcrypt.hash(newPassword, salt);
 
@@ -211,9 +243,9 @@ const resetPassword = async (email, otp, newPassword) => {
         await user.save();
         return { message: 'Password reset successful. You can now login.' };
     } else {
-        throw new Error('Invalid or expired OTP');
+        throw new Error('Invalid or expired reset link. Please request a new one.');
     }
-}
+};
 
 const resendOtp = async (email) => {
     const user = await User.findOne({ email });
@@ -249,6 +281,7 @@ module.exports = {
     login,
     verifyOtp,
     forgotPassword,
+    verifyResetToken,
     resetPassword,
     resendOtp
 };

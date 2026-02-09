@@ -87,4 +87,29 @@ const getWelcomeEmailTemplate = (name, email, password) => {
     return getEmailLayout(content);
 };
 
-module.exports = { getOtpEmailTemplate, getWelcomeEmailTemplate };
+const getResetPasswordEmailTemplate = (resetUrl) => {
+    const content = `
+        <h2 style="color: #111827; margin-top: 0; margin-bottom: 16px; font-size: 20px; font-weight: 600;">Reset Your Password</h2>
+        <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
+            You requested to reset your password. Click the button below to proceed.
+        </p>
+
+        <div style="text-align: center; margin-bottom: 32px;">
+            <a href="${resetUrl}" style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
+                Reset Password
+            </a>
+        </div>
+        
+        <p style="color: #6b7280; font-size: 14px; text-align: center; margin-bottom: 0;">
+            If the button doesn't work, copy and paste this link into your browser:<br>
+            <a href="${resetUrl}" style="color: #2563eb; word-break: break-all;">${resetUrl}</a>
+        </p>
+
+        <p style="color: #9ca3af; font-size: 13px; text-align: center; margin-top: 24px;">
+            This link will expire in 10 minutes. If you didn't request a password reset, please ignore this email.
+        </p>
+    `;
+    return getEmailLayout(content);
+};
+
+module.exports = { getOtpEmailTemplate, getWelcomeEmailTemplate, getResetPasswordEmailTemplate };
