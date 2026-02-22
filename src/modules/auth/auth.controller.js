@@ -88,6 +88,8 @@ const verifyForgotOtp = async (req, res) => {
 // @access  Public
 const resetPassword = async (req, res) => {
     const { email, otp, token, newPassword } = req.body;
+
+    console.log('from user side reset password', req.body)
     // Accept either otp or token
     const verificationCode = otp || token;
 
