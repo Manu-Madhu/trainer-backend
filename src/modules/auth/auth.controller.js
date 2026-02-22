@@ -62,6 +62,8 @@ const forgotPassword = async (req, res) => {
 // @access  Public
 const forgotPasswordOtp = async (req, res) => {
     const { email } = req.body;
+
+    console.log('from user side forgot password otp', req.body)
     try {
         const result = await authService.forgotPasswordOtp(email);
         res.json(result);
