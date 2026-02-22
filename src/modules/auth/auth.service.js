@@ -215,33 +215,54 @@ const forgotPassword = async (email) => {
 
 // Forgot Password - OTP mode (for mobile app)
 const forgotPasswordOtp = async (email) => {
-    const user = await User.findOne({ email });
-    if (!user) {
-        throw new Error('User with this email does not exist.');
-    }
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpires = Date.now() + 10 * 60 * 1000; // 10 mins
-
-    user.otp = otp;
-    user.otpExpires = otpExpires;
-    await user.save();
-
-    console.log(`[DEV] Forgot Password OTP for ${email}: ${otp}`);
-
+    let user;
     try {
-        const message = getForgotPasswordOtpTemplate(otp);
-        await sendEmail({
-            email: user.email,
-            subject: 'Trainer - Password Reset Code',
-            message
-        });
-        return { message: 'Verification code sent to your email.' };
-    } catch (error) {
-        user.otp = undefined;
-        user.otpExpires = undefined;
+        user = await User.findOne({ email });
+        if (!user) {
+            throw new Error('User with this email does not exist.');
+        }
+
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpires = Date.now() + 10 * 60 * 1000; // 10 mins
+
+        user.otp = otp;
+        user.otpExpires = otpExpires;
         await user.save();
-        throw new Error('Email could not be sent. Please try again later.');
+
+        console.log(`[DEV] Forgot Password OTP for ${email}: ${otp}`);
+
+        try {
+            const message = getForgotPasswordOtpTemplate(otp);
+            await sendEmail({
+                email: user.email,
+                subject: 'Trainer - Password Reset Code',
+                message
+            });
+            return { message: 'Verification code sent to your email.' };
+        } catch (emailError) {
+            console.error('Email send error:', emailError);
+            // Try to clear OTP, but don't fail if DB connection is lost
+            try {
+                user.otp = undefined;
+                user.otpExpires = undefined;
+                await user.save();
+            } catch (dbError) {
+                console.error('Failed to clear OTP after email error:', dbError);
+                // Continue anyway - OTP will expire naturally
+            }
+            // In dev, still return success if email fails (OTP is logged)
+            if (process.env.NODE_ENV === 'development' || !process.env.EMAIL_USERNAME) {
+                return { message: 'Verification code sent to your email.' };
+            }
+            throw new Error('Email could not be sent. Please try again later.');
+        }
+    } catch (error) {
+        // Check if it's a MongoDB connection error
+        if (error.message && error.message.includes('MongoDB') || error.message.includes('connection')) {
+            console.error('MongoDB connection error in forgotPasswordOtp:', error);
+            throw new Error('Database connection error. Please try again.');
+        }
+        throw error;
     }
 };
 

@@ -7,7 +7,11 @@ const connectDB = require('./config/db');
 dotenv.config();
 
 // Connect to database
-connectDB();
+// In serverless (Vercel), connection is handled per-request
+// In regular server, connect once at startup
+if (!process.env.VERCEL) {
+    connectDB();
+}
 
 const app = express();
 
@@ -15,6 +19,22 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Ensure DB connection for serverless (Vercel)
+app.use(async (req, res, next) => {
+    if (process.env.VERCEL) {
+        const mongoose = require('mongoose');
+        if (mongoose.connection.readyState === 0) {
+            try {
+                await connectDB();
+            } catch (error) {
+                console.error('Failed to connect to DB:', error);
+                return res.status(500).json({ message: 'Database connection failed' });
+            }
+        }
+    }
+    next();
+});
 
 app.use((req, res, next) => {
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl}`);
