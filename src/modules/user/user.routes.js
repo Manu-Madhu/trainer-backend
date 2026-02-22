@@ -8,6 +8,7 @@ const { protect } = require('../../middleware/authMiddleware');
 
 router.get('/home', protect, userController.getHomeData);
 router.post('/premium-request', protect, upload.single('screenshot'), userController.requestPremium);
+router.delete('/request-deletion', protect, userController.requestAccountDeletion);
 
 router.get('/', userController.getUsers);
 router.get('/:id', userController.getUserById);

@@ -368,6 +368,15 @@ const requestPremium = async (userId, screenshotUrl) => {
     return payment;
 };
 
+const requestAccountDeletion = async (userId) => {
+    const user = await userRepository.findUserById(userId);
+    if (!user) {
+        throw new Error('User not found');
+    }
+    // Set isDeleted flag to true. You can decide if you want to soft delete immediately or keep it for admin review.
+    return await userRepository.updateUser(userId, { isDeleted: true });
+};
+
 module.exports = {
     getAllUsers,
     getUserById,
@@ -378,5 +387,6 @@ module.exports = {
     updateUser,
     getHomeData,
     requestPremium,
+    requestAccountDeletion,
     checkAndExpireSubscription
 };

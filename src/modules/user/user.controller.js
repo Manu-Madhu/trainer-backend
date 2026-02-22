@@ -128,4 +128,15 @@ const requestPremium = async (req, res) => {
     }
 };
 
-module.exports = { getUsers, getUserById, registerUser, toggleBlockStatus, deleteUser, updateUser, getHomeData, requestPremium };
+const requestAccountDeletion = async (req, res) => {
+    try {
+        const userId = req.user.id; // User requesting their own deletion
+        await userService.requestAccountDeletion(userId);
+        res.json({ message: 'Account marked for deletion successfully.' });
+    } catch (error) {
+        console.error("Request Account Deletion Error:", error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
+module.exports = { getUsers, getUserById, registerUser, toggleBlockStatus, deleteUser, updateUser, getHomeData, requestPremium, requestAccountDeletion };
