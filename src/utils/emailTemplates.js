@@ -87,6 +87,24 @@ const getWelcomeEmailTemplate = (name, email, password) => {
     return getEmailLayout(content);
 };
 
+const getForgotPasswordOtpTemplate = (otp) => {
+    const content = `
+        <h2 style="color: #111827; margin-top: 0; margin-bottom: 16px; font-size: 20px; font-weight: 600;">Reset Your Password</h2>
+        <p style="color: #4b5563; font-size: 16px; line-height: 1.6; margin-bottom: 24px;">
+            You requested to reset your password. Use the One-Time Password (OTP) below to verify your identity.
+        </p>
+        
+        <div style="background-color: #f3f4f6; border-radius: 8px; padding: 24px; text-align: center; margin-bottom: 24px; border: 1px solid #e5e7eb;">
+            <span style="font-size: 32px; font-weight: 700; color: #2563eb; letter-spacing: 6px; font-family: monospace;">${otp}</span>
+        </div>
+
+        <p style="color: #6b7280; font-size: 14px; text-align: center; margin-bottom: 0;">
+            This code will expire in 10 minutes. If you didn't request this, please ignore this email.
+        </p>
+    `;
+    return getEmailLayout(content);
+};
+
 const getResetPasswordEmailTemplate = (resetUrl) => {
     const content = `
         <h2 style="color: #111827; margin-top: 0; margin-bottom: 16px; font-size: 20px; font-weight: 600;">Reset Your Password</h2>
@@ -112,4 +130,4 @@ const getResetPasswordEmailTemplate = (resetUrl) => {
     return getEmailLayout(content);
 };
 
-module.exports = { getOtpEmailTemplate, getWelcomeEmailTemplate, getResetPasswordEmailTemplate };
+module.exports = { getOtpEmailTemplate, getWelcomeEmailTemplate, getResetPasswordEmailTemplate, getForgotPasswordOtpTemplate };

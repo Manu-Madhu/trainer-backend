@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const sendEmail = require('../../utils/sendEmail');
-const { getOtpEmailTemplate, getResetPasswordEmailTemplate } = require('../../utils/emailTemplates');
+const { getOtpEmailTemplate, getResetPasswordEmailTemplate, getForgotPasswordOtpTemplate } = require('../../utils/emailTemplates');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -213,6 +213,50 @@ const forgotPassword = async (email) => {
     }
 };
 
+// Forgot Password - OTP mode (for mobile app)
+const forgotPasswordOtp = async (email) => {
+    const user = await User.findOne({ email });
+    if (!user) {
+        throw new Error('User with this email does not exist.');
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = Date.now() + 10 * 60 * 1000; // 10 mins
+
+    user.otp = otp;
+    user.otpExpires = otpExpires;
+    await user.save();
+
+    console.log(`[DEV] Forgot Password OTP for ${email}: ${otp}`);
+
+    try {
+        const message = getForgotPasswordOtpTemplate(otp);
+        await sendEmail({
+            email: user.email,
+            subject: 'Trainer - Password Reset Code',
+            message
+        });
+        return { message: 'Verification code sent to your email.' };
+    } catch (error) {
+        user.otp = undefined;
+        user.otpExpires = undefined;
+        await user.save();
+        throw new Error('Email could not be sent. Please try again later.');
+    }
+};
+
+// Verify forgot password OTP (does not modify user - just validates)
+const verifyForgotOtp = async (email, otp) => {
+    const user = await User.findOne({ email });
+    if (!user) {
+        throw new Error('User not found');
+    }
+    if (user.otp === otp && user.otpExpires > Date.now()) {
+        return { valid: true };
+    }
+    throw new Error('Invalid or expired verification code');
+};
+
 const verifyResetToken = async (email, token) => {
     const user = await User.findOne({ email });
     if (!user) {
@@ -281,6 +325,8 @@ module.exports = {
     login,
     verifyOtp,
     forgotPassword,
+    forgotPasswordOtp,
+    verifyForgotOtp,
     verifyResetToken,
     resetPassword,
     resendOtp

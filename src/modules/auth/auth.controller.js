@@ -53,10 +53,33 @@ const forgotPassword = async (req, res) => {
         const result = await authService.forgotPassword(email);
         res.json(result);
     } catch (error) {
-        // Return 200 even if user not found for security? 
-        // User asked to check if existing one.
-        // Current service throws error if not found.
         res.status(404).json({ message: error.message });
+    }
+};
+
+// @desc    Forgot Password - Send OTP (for mobile)
+// @route   POST /api/auth/forgot-password-otp
+// @access  Public
+const forgotPasswordOtp = async (req, res) => {
+    const { email } = req.body;
+    try {
+        const result = await authService.forgotPasswordOtp(email);
+        res.json(result);
+    } catch (error) {
+        res.status(404).json({ message: error.message });
+    }
+};
+
+// @desc    Verify Forgot Password OTP
+// @route   POST /api/auth/verify-forgot-otp
+// @access  Public
+const verifyForgotOtp = async (req, res) => {
+    const { email, otp } = req.body;
+    try {
+        const result = await authService.verifyForgotOtp(email, otp);
+        res.json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
     }
 };
 
@@ -161,6 +184,8 @@ module.exports = {
     loginUser,
     verifyOtp,
     forgotPassword,
+    forgotPasswordOtp,
+    verifyForgotOtp,
     resetPassword,
     getResetPasswordPageController,
     resetPasswordSubmit,
