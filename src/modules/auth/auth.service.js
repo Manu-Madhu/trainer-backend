@@ -118,6 +118,10 @@ const login = async (email, password) => {
         throw new Error('Account is blocked. Please contact support.');
     }
 
+    if (user.isDeleted) {
+        throw new Error('Account has been deleted.');
+    }
+
     if (await bcrypt.compare(password, user.password)) {
         return {
             _id: user._id,
@@ -146,6 +150,10 @@ const verifyOtp = async (email, otp) => {
 
     if (!user) {
         throw new Error('User not found');
+    }
+
+    if (user.isDeleted) {
+        throw new Error('Account has been deleted.');
     }
 
     if (user.otp === otp && user.otpExpires > Date.now()) {
@@ -180,6 +188,10 @@ const forgotPassword = async (email) => {
     const user = await User.findOne({ email });
     if (!user) {
         throw new Error('User with this email does not exist.');
+    }
+
+    if (user.isDeleted) {
+        throw new Error('Account has been deleted.');
     }
 
     // Generate a secure random token
@@ -220,6 +232,10 @@ const forgotPasswordOtp = async (email) => {
         user = await User.findOne({ email });
         if (!user) {
             throw new Error('User with this email does not exist.');
+        }
+
+        if (user.isDeleted) {
+            throw new Error('Account has been deleted.');
         }
 
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -272,6 +288,9 @@ const verifyForgotOtp = async (email, otp) => {
     if (!user) {
         throw new Error('User not found');
     }
+    if (user.isDeleted) {
+        throw new Error('Account has been deleted.');
+    }
     if (user.otp === otp && user.otpExpires > Date.now()) {
         return { valid: true };
     }
@@ -282,6 +301,9 @@ const verifyResetToken = async (email, token) => {
     const user = await User.findOne({ email });
     if (!user) {
         throw new Error('User not found'); // Or 'Invalid link'
+    }
+    if (user.isDeleted) {
+        throw new Error('Account has been deleted.');
     }
 
     if (user.otp === token && user.otpExpires > Date.now()) {
@@ -294,6 +316,9 @@ const resetPassword = async (email, token, newPassword) => {
     const user = await User.findOne({ email });
     if (!user) {
         throw new Error('User not found');
+    }
+    if (user.isDeleted) {
+        throw new Error('Account has been deleted.');
     }
 
     if (user.otp === token && user.otpExpires > Date.now()) {
@@ -316,6 +341,10 @@ const resendOtp = async (email) => {
     const user = await User.findOne({ email });
     if (!user) {
         throw new Error('User not found');
+    }
+
+    if (user.isDeleted) {
+        throw new Error('Account has been deleted.');
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();

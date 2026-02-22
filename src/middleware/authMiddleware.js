@@ -20,6 +20,14 @@ const protect = async (req, res, next) => {
                 return res.status(401).json({ message: 'Not authorized, user not found' });
             }
 
+            if (req.user.isDeleted) {
+                return res.status(401).json({ message: 'Not authorized, account deleted' });
+            }
+
+            if (req.user.isBlocked) {
+                return res.status(401).json({ message: 'Not authorized, account blocked' });
+            }
+
             // OPTIMIZED: Only check expiration if user is currently active/premium
             // This prevents unnecessary service calls for Free users or already Expired users
             if (req.user.subscription &&
