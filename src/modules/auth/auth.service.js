@@ -19,7 +19,12 @@ const register = async (userData) => {
     const userExists = await User.findOne({ email });
 
     if (userExists) {
-        throw new Error('User already exists');
+        if (userExists.isDeleted) {
+            // Delete the old soft-deleted user completely to free up the email Let the registration continue.
+            await User.deleteOne({ _id: userExists._id });
+        } else {
+            throw new Error('User already exists');
+        }
     }
 
     const salt = await bcrypt.genSalt(10);

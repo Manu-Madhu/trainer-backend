@@ -73,7 +73,11 @@ const registerUser = async (userData) => {
     // Check if user exists
     const userExists = await userRepository.findUserByEmail(userData.email);
     if (userExists) {
-        throw new Error('User already exists');
+        if (userExists.isDeleted) {
+            await userRepository.deleteUser(userExists._id);
+        } else {
+            throw new Error('User already exists');
+        }
     }
 
     // Hash password
