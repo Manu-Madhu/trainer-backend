@@ -2,6 +2,19 @@ const SubscriptionPlan = require('./subscription.model');
 const User = require('../user/user.model');
 const Payment = require('./payment.model');
 const Settings = require('../settings/settings.model');
+const crypto = require('crypto');
+const razorpay = require('../../config/razorpay');
+
+// Helper to add 1 month safely
+const addOneMonth = (date) => {
+    const d = new Date(date);
+    const originalDay = d.getDate();
+    d.setMonth(d.getMonth() + 1);
+    if (d.getDate() !== originalDay) {
+        d.setDate(0); // Snap to last day of previous month
+    }
+    return d;
+};
 
 const getPlans = async () => {
     return await SubscriptionPlan.find({ isActive: true });
@@ -288,6 +301,218 @@ const rejectPayment = async (paymentId, reason) => {
     return payment;
 };
 
+const createRazorpayOrder = async (userId, planId) => {
+    const user = await User.findById(userId);
+    if (!user) throw new Error('User not found');
+
+    let amount = 500;
+    if (planId) {
+        const plan = await SubscriptionPlan.findById(planId);
+        if (plan) {
+            amount = plan.price;
+        }
+    } else {
+        const settings = await Settings.findOne({ type: 'payment_config' });
+        if (settings && settings.amount) {
+            amount = settings.amount;
+        }
+    }
+
+    const now = new Date();
+    // Determine billing target month/year based on whether current subscription is active
+    let baseDate = now;
+    if (user.subscription && user.subscription.plan === 'premium' && user.subscription.endDate) {
+        const existingEnd = new Date(user.subscription.endDate);
+        if (existingEnd > now) {
+            baseDate = existingEnd;
+        }
+    }
+
+    let targetMonth = baseDate.getMonth() + 1;
+    let targetYear = baseDate.getFullYear();
+
+    // Create order with Razorpay
+    const options = {
+        amount: Math.round(amount * 100), // amount in paise
+        currency: 'INR',
+        receipt: `rcpt_${Date.now().toString().slice(-8)}_${userId.toString().slice(-4)}`,
+        notes: {
+            userId: userId.toString(),
+            planId: planId || 'standard_gold'
+        }
+    };
+
+    const order = await razorpay.orders.create(options);
+
+    // Look for existing pending payment record
+    let payment = await Payment.findOne({
+        user: userId,
+        month: targetMonth,
+        year: targetYear,
+        status: 'pending'
+    });
+
+    if (payment) {
+        payment.amount = amount;
+        payment.transactionId = order.id;
+        payment.razorpayOrderId = order.id;
+        payment.method = 'razorpay';
+        payment.currency = 'INR';
+        await payment.save();
+    } else {
+        const existingRecord = await Payment.findOne({
+            user: userId,
+            month: targetMonth,
+            year: targetYear
+        });
+
+        if (existingRecord && existingRecord.status !== 'paid') {
+            existingRecord.amount = amount;
+            existingRecord.status = 'pending';
+            existingRecord.transactionId = order.id;
+            existingRecord.razorpayOrderId = order.id;
+            existingRecord.method = 'razorpay';
+            existingRecord.currency = 'INR';
+            existingRecord.rejectionReason = undefined;
+            await existingRecord.save();
+            payment = existingRecord;
+        } else if (!existingRecord) {
+            payment = await Payment.create({
+                user: userId,
+                amount: amount,
+                currency: 'INR',
+                month: targetMonth,
+                year: targetYear,
+                status: 'pending',
+                method: 'razorpay',
+                transactionId: order.id,
+                razorpayOrderId: order.id
+            });
+        } else {
+            // Already paid for targetMonth/Year (e.g. advance renewal), roll to next month
+            const nextDate = addOneMonth(baseDate);
+            targetMonth = nextDate.getMonth() + 1;
+            targetYear = nextDate.getFullYear();
+
+            payment = await Payment.create({
+                user: userId,
+                amount: amount,
+                currency: 'INR',
+                month: targetMonth,
+                year: targetYear,
+                status: 'pending',
+                method: 'razorpay',
+                transactionId: order.id,
+                razorpayOrderId: order.id
+            });
+        }
+    }
+
+    return {
+        orderId: order.id,
+        amount: order.amount,
+        currency: order.currency,
+        keyId: process.env.RAZORPAY_KEY_ID || 'rzp_test_Tbwu0j2Qz6btzs',
+        user: {
+            name: user.name,
+            email: user.email,
+            phone: user.phone
+        }
+    };
+};
+
+const verifyRazorpayPayment = async (userId, { razorpay_order_id, razorpay_payment_id, razorpay_signature }) => {
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+        throw new Error('Payment verification parameters missing');
+    }
+
+    const keySecret = process.env.RAZORPAY_KEY_SECRET || 'QG1MFgBU8xu5k7rlhkML6fMJ';
+    const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+    const expectedSignature = crypto
+        .createHmac('sha256', keySecret)
+        .update(body.toString())
+        .digest('hex');
+
+    if (expectedSignature !== razorpay_signature) {
+        throw new Error('Invalid payment signature');
+    }
+
+    let payment = await Payment.findOne({
+        $or: [
+            { razorpayOrderId: razorpay_order_id },
+            { transactionId: razorpay_order_id }
+        ]
+    });
+
+    const user = await User.findById(userId || (payment && payment.user));
+    if (!user) throw new Error('User not found');
+
+    if (payment && payment.status === 'paid') {
+        return {
+            success: true,
+            message: 'Payment already verified',
+            payment,
+            subscription: user.subscription
+        };
+    }
+
+    const now = new Date();
+    let startDate = now;
+    let endDate = addOneMonth(now);
+
+    if (user.subscription && user.subscription.plan === 'premium' && user.subscription.endDate) {
+        const existingEnd = new Date(user.subscription.endDate);
+        if (existingEnd > now) {
+            startDate = user.subscription.startDate || now;
+            endDate = addOneMonth(existingEnd);
+        }
+    }
+
+    // Update user subscription immediately
+    user.subscription = {
+        plan: 'premium',
+        status: 'active',
+        startDate: startDate,
+        endDate: endDate,
+        lastPrice: payment ? payment.amount : undefined
+    };
+    await user.save();
+
+    if (!payment) {
+        payment = await Payment.create({
+            user: user._id,
+            amount: 500,
+            currency: 'INR',
+            month: startDate.getMonth() + 1,
+            year: startDate.getFullYear(),
+            status: 'paid',
+            method: 'razorpay',
+            transactionId: razorpay_order_id,
+            razorpayOrderId: razorpay_order_id,
+            razorpayPaymentId: razorpay_payment_id,
+            razorpaySignature: razorpay_signature,
+            paidAt: now,
+            startDate,
+            endDate
+        });
+    } else {
+        payment.status = 'paid';
+        payment.paidAt = now;
+        payment.startDate = startDate;
+        payment.endDate = endDate;
+        payment.razorpayPaymentId = razorpay_payment_id;
+        payment.razorpaySignature = razorpay_signature;
+        payment.method = 'razorpay';
+        await payment.save();
+    }
+
+    return {
+        success: true,
+        payment,
+        subscription: user.subscription
+    };
+};
+
 module.exports = {
     getPlans,
     subscribeUser,
@@ -297,5 +522,8 @@ module.exports = {
     getUserPaymentHistory,
     getPendingPayments,
     approvePayment,
-    rejectPayment
+    rejectPayment,
+    createRazorpayOrder,
+    verifyRazorpayPayment
 };
+

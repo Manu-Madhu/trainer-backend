@@ -7,6 +7,10 @@ router.get('/plans', subscriptionController.getPlans);
 router.post('/plans', protect, admin, subscriptionController.createPlan);
 router.post('/subscribe', protect, subscriptionController.subscribe);
 
+// Razorpay Gateway
+router.post('/razorpay/create-order', protect, subscriptionController.createRazorpayOrder);
+router.post('/razorpay/verify', protect, subscriptionController.verifyRazorpayPayment);
+
 // Admin Specific
 router.get('/admin/stats', protect, admin, subscriptionController.getAdminStats);
 router.get('/admin/users', protect, admin, subscriptionController.getAdminPaidUsers);

@@ -56,6 +56,17 @@ const paymentSchema = mongoose.Schema(
         },
         rejectionReason: {
             type: String
+        },
+        razorpayOrderId: {
+            type: String,
+            index: true
+        },
+        razorpayPaymentId: {
+            type: String,
+            index: true
+        },
+        razorpaySignature: {
+            type: String
         }
     },
     {

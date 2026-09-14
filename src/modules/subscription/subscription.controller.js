@@ -124,6 +124,36 @@ const rejectPayment = async (req, res) => {
     }
 };
 
+// @desc    Create Razorpay Order
+// @route   POST /api/subscriptions/razorpay/create-order
+// @access  Private
+const createRazorpayOrder = async (req, res) => {
+    try {
+        const { planId } = req.body;
+        const result = await subscriptionService.createRazorpayOrder(req.user._id, planId);
+        res.status(201).json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
+// @desc    Verify Razorpay Payment
+// @route   POST /api/subscriptions/razorpay/verify
+// @access  Private
+const verifyRazorpayPayment = async (req, res) => {
+    try {
+        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+        const result = await subscriptionService.verifyRazorpayPayment(req.user._id, {
+            razorpay_order_id,
+            razorpay_payment_id,
+            razorpay_signature
+        });
+        res.json(result);
+    } catch (error) {
+        res.status(400).json({ message: error.message });
+    }
+};
+
 module.exports = {
     getPlans,
     subscribe,
@@ -134,5 +164,8 @@ module.exports = {
     getMyHistory,
     getPendingPayments,
     approvePayment,
-    rejectPayment
+    rejectPayment,
+    createRazorpayOrder,
+    verifyRazorpayPayment
 };
+

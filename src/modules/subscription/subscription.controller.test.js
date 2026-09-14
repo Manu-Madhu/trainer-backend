@@ -9,6 +9,18 @@ const jwt = require('jsonwebtoken');
 
 const secret = 'test_secret';
 process.env.JWT_SECRET = secret;
+process.env.RAZORPAY_KEY_SECRET = 'test_razorpay_secret';
+process.env.RAZORPAY_KEY_ID = 'test_razorpay_key';
+
+jest.mock('../../config/razorpay', () => ({
+    orders: {
+        create: jest.fn().mockResolvedValue({
+            id: 'order_test_123',
+            amount: 50000,
+            currency: 'INR'
+        })
+    }
+}));
 
 let mongoServer;
 let app;
@@ -118,4 +130,91 @@ describe('Subscription Controller API', () => {
             expect(res.body.history[0].notes).toBe('FindMe');
         });
     });
+
+    describe('Razorpay Flow API', () => {
+        const crypto = require('crypto');
+        let userToken;
+        let testUser;
+
+        beforeEach(async () => {
+            testUser = await User.create({
+                name: 'Regular Member',
+                email: `user_${Date.now()}@example.com`,
+                password: 'password123',
+                role: 'user'
+            });
+            userToken = jwt.sign({ id: testUser._id, role: 'user' }, secret);
+        });
+
+        it('POST /api/subscriptions/razorpay/create-order should return order details', async () => {
+            const res = await request(app)
+                .post('/api/subscriptions/razorpay/create-order')
+                .set('Authorization', `Bearer ${userToken}`)
+                .send({});
+
+            expect(res.status).toBe(201);
+            expect(res.body).toHaveProperty('orderId', 'order_test_123');
+            expect(res.body).toHaveProperty('amount', 50000);
+            expect(res.body).toHaveProperty('keyId');
+
+            // Verify a pending payment was created in database
+            const payment = await Payment.findOne({ razorpayOrderId: 'order_test_123' });
+            expect(payment).toBeTruthy();
+            expect(payment.status).toBe('pending');
+            expect(payment.method).toBe('razorpay');
+        });
+
+        it('POST /api/subscriptions/razorpay/verify should verify valid signature and activate premium', async () => {
+            // First create the pending order
+            await request(app)
+                .post('/api/subscriptions/razorpay/create-order')
+                .set('Authorization', `Bearer ${userToken}`)
+                .send({});
+
+            const paymentId = 'pay_test_456';
+            const orderId = 'order_test_123';
+            const validSignature = crypto
+                .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+                .update(`${orderId}|${paymentId}`)
+                .digest('hex');
+
+            const res = await request(app)
+                .post('/api/subscriptions/razorpay/verify')
+                .set('Authorization', `Bearer ${userToken}`)
+                .send({
+                    razorpay_order_id: orderId,
+                    razorpay_payment_id: paymentId,
+                    razorpay_signature: validSignature
+                });
+
+            expect(res.status).toBe(200);
+            expect(res.body.success).toBe(true);
+            expect(res.body.subscription.status).toBe('active');
+            expect(res.body.subscription.plan).toBe('premium');
+
+            // Check database
+            const updatedUser = await User.findById(testUser._id);
+            expect(updatedUser.subscription.status).toBe('active');
+            expect(updatedUser.subscription.plan).toBe('premium');
+
+            const updatedPayment = await Payment.findOne({ razorpayOrderId: orderId });
+            expect(updatedPayment.status).toBe('paid');
+            expect(updatedPayment.razorpayPaymentId).toBe(paymentId);
+        });
+
+        it('POST /api/subscriptions/razorpay/verify should reject invalid signature', async () => {
+            const res = await request(app)
+                .post('/api/subscriptions/razorpay/verify')
+                .set('Authorization', `Bearer ${userToken}`)
+                .send({
+                    razorpay_order_id: 'order_test_123',
+                    razorpay_payment_id: 'pay_test_456',
+                    razorpay_signature: 'invalid_signature_hash'
+                });
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toContain('Invalid payment signature');
+        });
+    });
 });
+
