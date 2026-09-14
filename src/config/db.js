@@ -1,4 +1,13 @@
 const mongoose = require('mongoose');
+const dns = require('dns');
+
+// Configure public DNS resolvers to resolve MongoDB SRV records
+// Prevents querySrv ECONNREFUSED on local ISP / Windows DNS resolvers
+try {
+    dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+} catch (err) {
+    console.warn('Could not set custom DNS servers:', err.message);
+}
 
 // Check if already connected
 const isConnected = () => {
