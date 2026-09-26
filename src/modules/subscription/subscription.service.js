@@ -513,6 +513,153 @@ const verifyRazorpayPayment = async (userId, { razorpay_order_id, razorpay_payme
     };
 };
 
+const handleRazorpayWebhook = async (eventData, signature, rawBody) => {
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET || 'QG1MFgBU8xu5k7rlhkML6fMJ';
+
+    // Verify signature using timing-safe HMAC SHA-256
+    const bodyContent = rawBody || JSON.stringify(eventData);
+    const expectedSignature = crypto
+        .createHmac('sha256', webhookSecret)
+        .update(bodyContent)
+        .digest('hex');
+
+    const signatureBuffer = Buffer.from(signature || '', 'utf8');
+    const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+    const isValid = signatureBuffer.length === expectedBuffer.length &&
+        crypto.timingSafeEqual(signatureBuffer, expectedBuffer);
+
+    if (!isValid) {
+        throw new Error('Invalid webhook signature');
+    }
+
+    const { event, payload } = eventData || {};
+    console.log(`[Razorpay Webhook] Processing event: ${event}`);
+
+    if (event === 'order.paid' || event === 'payment.captured') {
+        const orderEntity = payload?.order?.entity;
+        const paymentEntity = payload?.payment?.entity;
+
+        const orderId = orderEntity?.id || paymentEntity?.order_id;
+        const paymentId = paymentEntity?.id;
+        const amountPaise = paymentEntity?.amount || orderEntity?.amount;
+        const amount = amountPaise ? Math.round(amountPaise / 100) : 500;
+        const userId = orderEntity?.notes?.userId || paymentEntity?.notes?.userId;
+
+        if (!orderId && !paymentId) {
+            return { processed: false, reason: 'No orderId or paymentId found in payload' };
+        }
+
+        // 1. Search for existing payment record
+        const queryConditions = [];
+        if (orderId) {
+            queryConditions.push({ razorpayOrderId: orderId }, { transactionId: orderId });
+        }
+        if (paymentId) {
+            queryConditions.push({ razorpayPaymentId: paymentId });
+        }
+
+        let payment = await Payment.findOne({ $or: queryConditions });
+
+        // Idempotency: if already paid, don't re-extend or duplicate
+        if (payment && payment.status === 'paid') {
+            console.log(`[Razorpay Webhook] Order ${orderId} already marked as paid`);
+            return { processed: true, message: 'Payment already marked as paid' };
+        }
+
+        // 2. Resolve User
+        const targetUserId = (payment && payment.user) || userId;
+        if (!targetUserId) {
+            console.warn(`[Razorpay Webhook] Unable to find user for order ${orderId}`);
+            return { processed: false, reason: 'User not identifiable' };
+        }
+
+        const user = await User.findById(targetUserId);
+        if (!user) {
+            console.warn(`[Razorpay Webhook] User ${targetUserId} not found`);
+            return { processed: false, reason: 'User not found in database' };
+        }
+
+        // 3. Calculate Subscription Duration
+        const now = new Date();
+        let startDate = now;
+        let endDate = addOneMonth(now);
+
+        if (user.subscription && user.subscription.plan === 'premium' && user.subscription.endDate) {
+            const existingEnd = new Date(user.subscription.endDate);
+            if (existingEnd > now) {
+                startDate = user.subscription.startDate || now;
+                endDate = addOneMonth(existingEnd);
+            }
+        }
+
+        // 4. Activate User Subscription
+        user.subscription = {
+            plan: 'premium',
+            status: 'active',
+            startDate,
+            endDate,
+            lastPrice: payment ? payment.amount : amount
+        };
+        await user.save();
+
+        // 5. Update or Create Payment Record
+        if (payment) {
+            payment.status = 'paid';
+            payment.paidAt = now;
+            payment.startDate = startDate;
+            payment.endDate = endDate;
+            if (paymentId) payment.razorpayPaymentId = paymentId;
+            payment.method = 'razorpay';
+            await payment.save();
+        } else {
+            payment = await Payment.create({
+                user: user._id,
+                amount,
+                currency: 'INR',
+                month: startDate.getMonth() + 1,
+                year: startDate.getFullYear(),
+                status: 'paid',
+                method: 'razorpay',
+                transactionId: orderId || paymentId,
+                razorpayOrderId: orderId,
+                razorpayPaymentId: paymentId,
+                paidAt: now,
+                startDate,
+                endDate
+            });
+        }
+
+        console.log(`[Razorpay Webhook] Successfully activated premium for user ${user._id}`);
+        return { processed: true, paymentId: payment._id, userId: user._id };
+    }
+
+    if (event === 'payment.failed') {
+        const paymentEntity = payload?.payment?.entity;
+        const orderId = paymentEntity?.order_id;
+        const errorDesc = paymentEntity?.error_description || 'Payment failed on gateway';
+
+        if (orderId) {
+            const payment = await Payment.findOne({
+                $or: [
+                    { razorpayOrderId: orderId },
+                    { transactionId: orderId }
+                ]
+            });
+
+            if (payment && payment.status !== 'paid') {
+                payment.status = 'failed';
+                payment.rejectionReason = errorDesc;
+                await payment.save();
+                console.log(`[Razorpay Webhook] Marked payment for order ${orderId} as failed`);
+            }
+        }
+
+        return { processed: true, paymentStatus: 'failed' };
+    }
+
+    return { processed: false, reason: `Ignored unhandled event: ${event}` };
+};
+
 module.exports = {
     getPlans,
     subscribeUser,
@@ -524,6 +671,7 @@ module.exports = {
     approvePayment,
     rejectPayment,
     createRazorpayOrder,
-    verifyRazorpayPayment
+    verifyRazorpayPayment,
+    handleRazorpayWebhook
 };
 

@@ -154,6 +154,25 @@ const verifyRazorpayPayment = async (req, res) => {
     }
 };
 
+// @desc    Handle Razorpay Webhook Event
+// @route   POST /api/subscriptions/razorpay/webhook
+// @access  Public (Signature-verified)
+const handleRazorpayWebhook = async (req, res) => {
+    try {
+        const signature = req.headers['x-razorpay-signature'];
+        if (!signature) {
+            return res.status(400).json({ message: 'Missing x-razorpay-signature header' });
+        }
+
+        const rawBody = req.rawBody ? req.rawBody.toString('utf8') : JSON.stringify(req.body);
+        const result = await subscriptionService.handleRazorpayWebhook(req.body, signature, rawBody);
+        res.status(200).json({ status: 'ok', ...result });
+    } catch (error) {
+        console.error('Razorpay Webhook Error:', error.message);
+        res.status(400).json({ message: error.message });
+    }
+};
+
 module.exports = {
     getPlans,
     subscribe,
@@ -166,6 +185,7 @@ module.exports = {
     approvePayment,
     rejectPayment,
     createRazorpayOrder,
-    verifyRazorpayPayment
+    verifyRazorpayPayment,
+    handleRazorpayWebhook
 };
 

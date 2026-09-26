@@ -216,5 +216,220 @@ describe('Subscription Controller API', () => {
             expect(res.body.message).toContain('Invalid payment signature');
         });
     });
+
+    describe('Razorpay Webhook API', () => {
+        const webhookSecret = 'test_webhook_secret';
+        const crypto = require('crypto');
+
+        beforeAll(() => {
+            process.env.RAZORPAY_WEBHOOK_SECRET = webhookSecret;
+        });
+
+        it('POST /api/subscriptions/razorpay/webhook should reject requests missing signature header', async () => {
+            const res = await request(app)
+                .post('/api/subscriptions/razorpay/webhook')
+                .send({ event: 'order.paid' });
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toContain('Missing x-razorpay-signature');
+        });
+
+        it('POST /api/subscriptions/razorpay/webhook should reject invalid webhook signature', async () => {
+            const res = await request(app)
+                .post('/api/subscriptions/razorpay/webhook')
+                .set('x-razorpay-signature', 'wrong_signature')
+                .send({ event: 'order.paid' });
+
+            expect(res.status).toBe(400);
+            expect(res.body.message).toContain('Invalid webhook signature');
+        });
+
+        it('POST /api/subscriptions/razorpay/webhook should process order.paid and activate premium', async () => {
+            // Create a user and a pending payment
+            const webhookUser = await User.create({
+                name: 'Webhook User',
+                email: 'webhookuser@example.com',
+                password: 'password123',
+                role: 'user'
+            });
+
+            const orderId = 'order_webhook_123';
+            const paymentId = 'pay_webhook_456';
+
+            await Payment.create({
+                user: webhookUser._id,
+                amount: 500,
+                currency: 'INR',
+                month: 5,
+                year: 2026,
+                status: 'pending',
+                method: 'razorpay',
+                transactionId: orderId,
+                razorpayOrderId: orderId
+            });
+
+            const payload = {
+                event: 'order.paid',
+                payload: {
+                    order: {
+                        entity: {
+                            id: orderId,
+                            amount: 50000,
+                            currency: 'INR',
+                            notes: { userId: webhookUser._id.toString() }
+                        }
+                    },
+                    payment: {
+                        entity: {
+                            id: paymentId,
+                            order_id: orderId,
+                            amount: 50000,
+                            currency: 'INR',
+                            status: 'captured'
+                        }
+                    }
+                }
+            };
+
+            const bodyString = JSON.stringify(payload);
+            const signature = crypto
+                .createHmac('sha256', webhookSecret)
+                .update(bodyString)
+                .digest('hex');
+
+            const res = await request(app)
+                .post('/api/subscriptions/razorpay/webhook')
+                .set('x-razorpay-signature', signature)
+                .send(payload);
+
+            expect(res.status).toBe(200);
+            expect(res.body.status).toBe('ok');
+            expect(res.body.processed).toBe(true);
+
+            // Verify user subscription updated
+            const updatedUser = await User.findById(webhookUser._id);
+            expect(updatedUser.subscription.status).toBe('active');
+            expect(updatedUser.subscription.plan).toBe('premium');
+
+            // Verify payment record updated
+            const updatedPayment = await Payment.findOne({ razorpayOrderId: orderId });
+            expect(updatedPayment.status).toBe('paid');
+            expect(updatedPayment.razorpayPaymentId).toBe(paymentId);
+        });
+
+        it('POST /api/subscriptions/razorpay/webhook should be idempotent when order is already paid', async () => {
+            const webhookUser = await User.create({
+                name: 'Idempotent User',
+                email: 'idempotent@example.com',
+                password: 'password123',
+                role: 'user'
+            });
+
+            const orderId = 'order_idempotent_123';
+            const paymentId = 'pay_idempotent_456';
+
+            await Payment.create({
+                user: webhookUser._id,
+                amount: 500,
+                currency: 'INR',
+                month: 6,
+                year: 2026,
+                status: 'paid',
+                method: 'razorpay',
+                transactionId: orderId,
+                razorpayOrderId: orderId,
+                razorpayPaymentId: paymentId
+            });
+
+            const payload = {
+                event: 'order.paid',
+                payload: {
+                    order: {
+                        entity: {
+                            id: orderId,
+                            amount: 50000
+                        }
+                    },
+                    payment: {
+                        entity: {
+                            id: paymentId,
+                            order_id: orderId,
+                            amount: 50000
+                        }
+                    }
+                }
+            };
+
+            const bodyString = JSON.stringify(payload);
+            const signature = crypto
+                .createHmac('sha256', webhookSecret)
+                .update(bodyString)
+                .digest('hex');
+
+            const res = await request(app)
+                .post('/api/subscriptions/razorpay/webhook')
+                .set('x-razorpay-signature', signature)
+                .send(payload);
+
+            expect(res.status).toBe(200);
+            expect(res.body.status).toBe('ok');
+            expect(res.body.message).toContain('already marked as paid');
+        });
+
+        it('POST /api/subscriptions/razorpay/webhook should mark payment as failed on payment.failed event', async () => {
+            const failUser = await User.create({
+                name: 'Failed User',
+                email: 'failed@example.com',
+                password: 'password123',
+                role: 'user'
+            });
+
+            const orderId = 'order_fail_123';
+
+            await Payment.create({
+                user: failUser._id,
+                amount: 500,
+                currency: 'INR',
+                month: 7,
+                year: 2026,
+                status: 'pending',
+                method: 'razorpay',
+                transactionId: orderId,
+                razorpayOrderId: orderId
+            });
+
+            const payload = {
+                event: 'payment.failed',
+                payload: {
+                    payment: {
+                        entity: {
+                            id: 'pay_fail_789',
+                            order_id: orderId,
+                            error_description: 'Card declined by issuing bank'
+                        }
+                    }
+                }
+            };
+
+            const bodyString = JSON.stringify(payload);
+            const signature = crypto
+                .createHmac('sha256', webhookSecret)
+                .update(bodyString)
+                .digest('hex');
+
+            const res = await request(app)
+                .post('/api/subscriptions/razorpay/webhook')
+                .set('x-razorpay-signature', signature)
+                .send(payload);
+
+            expect(res.status).toBe(200);
+            expect(res.body.status).toBe('ok');
+
+            const updatedPayment = await Payment.findOne({ razorpayOrderId: orderId });
+            expect(updatedPayment.status).toBe('failed');
+            expect(updatedPayment.rejectionReason).toContain('Card declined');
+        });
+    });
 });
+
 

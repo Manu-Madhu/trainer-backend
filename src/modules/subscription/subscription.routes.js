@@ -10,6 +10,7 @@ router.post('/subscribe', protect, subscriptionController.subscribe);
 // Razorpay Gateway
 router.post('/razorpay/create-order', protect, subscriptionController.createRazorpayOrder);
 router.post('/razorpay/verify', protect, subscriptionController.verifyRazorpayPayment);
+router.post('/razorpay/webhook', subscriptionController.handleRazorpayWebhook);
 
 // Admin Specific
 router.get('/admin/stats', protect, admin, subscriptionController.getAdminStats);
