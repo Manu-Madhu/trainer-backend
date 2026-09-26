@@ -31,7 +31,7 @@ const protect = async (req, res, next) => {
             // OPTIMIZED: Only check expiration if user is currently active/premium
             // This prevents unnecessary service calls for Free users or already Expired users
             if (req.user.subscription &&
-                req.user.subscription.plan === 'premium' &&
+                ['premium', 'platinum'].includes(req.user.subscription.plan) &&
                 req.user.subscription.status === 'active' &&
                 req.user.subscription.endDate) {
 
@@ -68,4 +68,12 @@ const trainer = (req, res, next) => {
     }
 };
 
-module.exports = { protect, admin, trainer };
+const gym = (req, res, next) => {
+    if (req.user && (req.user.role === 'gym' || req.user.role === 'admin')) {
+        next();
+    } else {
+        res.status(401).json({ message: 'Not authorized as a gym partner' });
+    }
+};
+
+module.exports = { protect, admin, trainer, gym };

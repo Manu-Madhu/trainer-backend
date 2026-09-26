@@ -20,7 +20,7 @@ const userSchema = mongoose.Schema(
         },
         role: {
             type: String,
-            enum: ['admin', 'trainer', 'user'],
+            enum: ['admin', 'trainer', 'user', 'gym'],
             default: 'user',
         },
         // Profile Details
@@ -63,7 +63,7 @@ const userSchema = mongoose.Schema(
         subscription: {
             plan: {
                 type: String,
-                enum: ['free', 'premium'],
+                enum: ['free', 'premium', 'platinum'],
                 default: 'free',
             },
             status: {
