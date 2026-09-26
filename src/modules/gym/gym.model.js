@@ -70,6 +70,15 @@ const gymSchema = new mongoose.Schema(
                 type: String,
             },
         ],
+        videoUrl: {
+            type: String,
+            default: '',
+        },
+        videos: [
+            {
+                type: String,
+            },
+        ],
         openingHours: {
             weekdays: { type: String, default: '06:00 AM - 10:00 PM' },
             weekends: { type: String, default: '07:00 AM - 08:00 PM' },
