@@ -235,15 +235,56 @@ const checkInAtGym = async (req, res) => {
 // @access  Private (User)
 const getUserCheckInHistory = async (req, res) => {
     try {
-        const checkIns = await GymCheckIn.find({ userId: req.user._id })
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        const skip = (page - 1) * limit;
+        const { search, month, year, date } = req.query;
+
+        const query = { userId: req.user._id };
+
+        // Date / Month / Year filter
+        if (date) {
+            const start = new Date(date);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(date);
+            end.setHours(23, 59, 59, 999);
+            query.checkInDate = { $gte: start, $lte: end };
+        } else if (month && year) {
+            const start = new Date(parseInt(year), parseInt(month) - 1, 1);
+            const end = new Date(parseInt(year), parseInt(month), 0, 23, 59, 59, 999);
+            query.checkInDate = { $gte: start, $lte: end };
+        } else if (year) {
+            const start = new Date(parseInt(year), 0, 1);
+            const end = new Date(parseInt(year), 11, 31, 23, 59, 59, 999);
+            query.checkInDate = { $gte: start, $lte: end };
+        }
+
+        let allRecords = await GymCheckIn.find(query)
             .populate('gymId', 'gymName address photos location')
-            .sort({ checkInDate: -1 })
-            .limit(50);
+            .sort({ checkInDate: -1 });
+
+        // Search filter (by gymName, city, or state)
+        if (search && search.trim()) {
+            const term = search.trim().toLowerCase();
+            allRecords = allRecords.filter(item => {
+                const name = item.gymId?.gymName?.toLowerCase() || '';
+                const city = item.gymId?.address?.city?.toLowerCase() || '';
+                const state = item.gymId?.address?.state?.toLowerCase() || '';
+                return name.includes(term) || city.includes(term) || state.includes(term);
+            });
+        }
+
+        const total = allRecords.length;
+        const paginatedData = allRecords.slice(skip, skip + limit);
 
         res.json({
             success: true,
-            count: checkIns.length,
-            data: checkIns,
+            total,
+            count: paginatedData.length,
+            page,
+            totalPages: Math.ceil(total / limit) || 1,
+            hasMore: skip + limit < total,
+            data: paginatedData,
         });
     } catch (error) {
         console.error('getUserCheckInHistory error:', error);
