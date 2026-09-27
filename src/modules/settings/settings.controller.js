@@ -33,16 +33,16 @@ const updatePaymentSettings = async (req, res) => {
         let settings = await Settings.findOne({ type: 'payment_config' });
 
         if (settings) {
-            settings.upiId = upiId || settings.upiId;
-            settings.amount = amount || settings.amount;
-            if (platinumAmount) settings.platinumAmount = platinumAmount;
+            if (upiId !== undefined) settings.upiId = upiId;
+            if (amount !== undefined) settings.amount = Number(amount);
+            if (platinumAmount !== undefined) settings.platinumAmount = Number(platinumAmount);
             await settings.save();
         } else {
             settings = await Settings.create({
                 type: 'payment_config',
                 upiId: upiId || 'ajithrajsree-1@oksbi',
-                amount: amount || 500,
-                platinumAmount: platinumAmount || 999
+                amount: amount !== undefined ? Number(amount) : 500,
+                platinumAmount: platinumAmount !== undefined ? Number(platinumAmount) : 999
             });
         }
 
