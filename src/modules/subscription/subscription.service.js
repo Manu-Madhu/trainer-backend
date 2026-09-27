@@ -65,9 +65,22 @@ const getAdminStats = async () => {
     const currentYear = now.getFullYear();
 
     // Sync pending payments with current settings price if changed
+    // Fix: sync each plan type separately so platinum keeps its own price
     const settings = await Settings.findOne({ type: 'payment_config' });
     if (settings) {
-        await Payment.updateMany({ status: 'pending' }, { amount: settings.amount });
+        const goldAmount = settings.amount || 500;
+        const platinumAmount = settings.platinumAmount || 999;
+
+        await Promise.all([
+            Payment.updateMany(
+                { status: 'pending', plan: { $in: ['premium', null, undefined] } },
+                { amount: goldAmount }
+            ),
+            Payment.updateMany(
+                { status: 'pending', plan: 'platinum' },
+                { amount: platinumAmount }
+            )
+        ]);
     }
 
     // 1. Total Earnings (Status: paid)
