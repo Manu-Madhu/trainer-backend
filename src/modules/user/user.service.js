@@ -44,8 +44,8 @@ const getAllUsers = async (query = {}) => {
 };
 
 const checkAndExpireSubscription = async (user) => {
-    // Only check if premium and has end date
-    if (user.subscription && user.subscription.plan === 'premium' && user.subscription.endDate) {
+    // Only check if premium or platinum and has end date
+    if (user.subscription && ['premium', 'platinum'].includes(user.subscription.plan) && user.subscription.endDate) {
         const now = new Date();
         const endDate = new Date(user.subscription.endDate);
         // Set to end of the day to ensure the subscription is valid for the entire last day
@@ -148,7 +148,7 @@ const getHomeData = async (userId) => {
     const subEndDate = user.subscription?.endDate ? new Date(user.subscription.endDate) : null;
     let daysLeft = 0;
 
-    if (user.subscription?.plan === 'premium') {
+    if (['premium', 'platinum'].includes(user.subscription?.plan)) {
         if (subEndDate) {
             // Set End Date to End of Day for fair calculated expiry
             subEndDate.setHours(23, 59, 59, 999);
