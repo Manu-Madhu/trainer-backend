@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const SubscriptionPlan = require('./subscription.model');
 const User = require('../user/user.model');
 const Payment = require('./payment.model');
@@ -258,8 +259,8 @@ const approvePayment = async (paymentId) => {
 
     endDate = addOneMonth(startDate);
 
-    // If user is already premium and not expired, extend from existing endDate
-    if (user.subscription && user.subscription.plan === 'premium' && user.subscription.endDate) {
+    // If user is already subscribed and not expired, extend from existing endDate
+    if (user.subscription && ['premium', 'platinum'].includes(user.subscription.plan) && user.subscription.endDate) {
         const existingEnd = new Date(user.subscription.endDate);
         if (existingEnd > now) {
             startDate = user.subscription.startDate || now; // Keep original start
@@ -267,8 +268,10 @@ const approvePayment = async (paymentId) => {
         }
     }
 
+    const planToActivate = payment.plan === 'platinum' ? 'platinum' : 'premium';
+
     user.subscription = {
-        plan: 'premium',
+        plan: planToActivate,
         status: 'active',
         startDate: startDate,
         endDate: endDate
@@ -305,23 +308,31 @@ const createRazorpayOrder = async (userId, planId) => {
     const user = await User.findById(userId);
     if (!user) throw new Error('User not found');
 
-    let amount = 500;
-    if (planId) {
+    const settings = await Settings.findOne({ type: 'payment_config' });
+    const goldPrice = settings?.amount || 500;
+    const platinumPrice = settings?.platinumAmount || 999;
+
+    let planType = 'premium';
+    let amount = goldPrice;
+
+    if (planId === 'platinum') {
+        planType = 'platinum';
+        amount = platinumPrice;
+    } else if (planId === 'premium' || planId === 'gold') {
+        planType = 'premium';
+        amount = goldPrice;
+    } else if (planId && mongoose.Types.ObjectId.isValid(planId)) {
         const plan = await SubscriptionPlan.findById(planId);
         if (plan) {
             amount = plan.price;
-        }
-    } else {
-        const settings = await Settings.findOne({ type: 'payment_config' });
-        if (settings && settings.amount) {
-            amount = settings.amount;
+            planType = plan.name?.toLowerCase().includes('platinum') ? 'platinum' : 'premium';
         }
     }
 
     const now = new Date();
     // Determine billing target month/year based on whether current subscription is active
     let baseDate = now;
-    if (user.subscription && user.subscription.plan === 'premium' && user.subscription.endDate) {
+    if (user.subscription && ['premium', 'platinum'].includes(user.subscription.plan) && user.subscription.endDate) {
         const existingEnd = new Date(user.subscription.endDate);
         if (existingEnd > now) {
             baseDate = existingEnd;
@@ -338,7 +349,8 @@ const createRazorpayOrder = async (userId, planId) => {
         receipt: `rcpt_${Date.now().toString().slice(-8)}_${userId.toString().slice(-4)}`,
         notes: {
             userId: userId.toString(),
-            planId: planId || 'standard_gold'
+            planId: planType,
+            plan: planType
         }
     };
 
@@ -354,6 +366,7 @@ const createRazorpayOrder = async (userId, planId) => {
 
     if (payment) {
         payment.amount = amount;
+        payment.plan = planType;
         payment.transactionId = order.id;
         payment.razorpayOrderId = order.id;
         payment.method = 'razorpay';
@@ -368,6 +381,7 @@ const createRazorpayOrder = async (userId, planId) => {
 
         if (existingRecord && existingRecord.status !== 'paid') {
             existingRecord.amount = amount;
+            existingRecord.plan = planType;
             existingRecord.status = 'pending';
             existingRecord.transactionId = order.id;
             existingRecord.razorpayOrderId = order.id;
@@ -380,6 +394,7 @@ const createRazorpayOrder = async (userId, planId) => {
             payment = await Payment.create({
                 user: userId,
                 amount: amount,
+                plan: planType,
                 currency: 'INR',
                 month: targetMonth,
                 year: targetYear,
@@ -397,6 +412,7 @@ const createRazorpayOrder = async (userId, planId) => {
             payment = await Payment.create({
                 user: userId,
                 amount: amount,
+                plan: planType,
                 currency: 'INR',
                 month: targetMonth,
                 year: targetYear,
@@ -460,7 +476,7 @@ const verifyRazorpayPayment = async (userId, { razorpay_order_id, razorpay_payme
     let startDate = now;
     let endDate = addOneMonth(now);
 
-    if (user.subscription && user.subscription.plan === 'premium' && user.subscription.endDate) {
+    if (user.subscription && ['premium', 'platinum'].includes(user.subscription.plan) && user.subscription.endDate) {
         const existingEnd = new Date(user.subscription.endDate);
         if (existingEnd > now) {
             startDate = user.subscription.startDate || now;
@@ -468,9 +484,11 @@ const verifyRazorpayPayment = async (userId, { razorpay_order_id, razorpay_payme
         }
     }
 
+    const planToActivate = payment?.plan === 'platinum' ? 'platinum' : 'premium';
+
     // Update user subscription immediately
     user.subscription = {
-        plan: 'premium',
+        plan: planToActivate,
         status: 'active',
         startDate: startDate,
         endDate: endDate,
@@ -481,7 +499,8 @@ const verifyRazorpayPayment = async (userId, { razorpay_order_id, razorpay_payme
     if (!payment) {
         payment = await Payment.create({
             user: user._id,
-            amount: 500,
+            amount: planToActivate === 'platinum' ? 999 : 500,
+            plan: planToActivate,
             currency: 'INR',
             month: startDate.getMonth() + 1,
             year: startDate.getFullYear(),
@@ -584,7 +603,7 @@ const handleRazorpayWebhook = async (eventData, signature, rawBody) => {
         let startDate = now;
         let endDate = addOneMonth(now);
 
-        if (user.subscription && user.subscription.plan === 'premium' && user.subscription.endDate) {
+        if (user.subscription && ['premium', 'platinum'].includes(user.subscription.plan) && user.subscription.endDate) {
             const existingEnd = new Date(user.subscription.endDate);
             if (existingEnd > now) {
                 startDate = user.subscription.startDate || now;
@@ -592,9 +611,11 @@ const handleRazorpayWebhook = async (eventData, signature, rawBody) => {
             }
         }
 
+        const planToActivate = (payment && payment.plan === 'platinum') ? 'platinum' : 'premium';
+
         // 4. Activate User Subscription
         user.subscription = {
-            plan: 'premium',
+            plan: planToActivate,
             status: 'active',
             startDate,
             endDate,

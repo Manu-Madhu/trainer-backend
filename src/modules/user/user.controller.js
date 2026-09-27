@@ -120,7 +120,7 @@ const requestPremium = async (req, res) => {
             return res.status(400).json({ message: 'Screenshot is required' });
         }
 
-        const result = await userService.requestPremium(req.user.id, screenshotUrl);
+        const result = await userService.requestPremium(req.user.id, screenshotUrl, req.body.plan);
         res.json(result);
     } catch (error) {
         console.error("Request Premium Error:", error);

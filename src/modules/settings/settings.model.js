@@ -16,6 +16,11 @@ const settingsSchema = new mongoose.Schema({
         type: Number,
         required: true,
         default: 500
+    },
+    platinumAmount: {
+        type: Number,
+        required: true,
+        default: 999
     }
 }, { timestamps: true });
 

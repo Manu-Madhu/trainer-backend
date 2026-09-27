@@ -28,6 +28,11 @@ const paymentSchema = mongoose.Schema(
             enum: ['paid', 'pending', 'failed', 'refunded'],
             default: 'pending',
         },
+        plan: {
+            type: String,
+            enum: ['premium', 'platinum'],
+            default: 'premium',
+        },
         method: {
             type: String, // 'stripe', 'paypal', 'manual', 'cash'
         },

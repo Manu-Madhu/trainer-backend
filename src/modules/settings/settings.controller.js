@@ -12,7 +12,8 @@ const getPaymentSettings = async (req, res) => {
             settings = await Settings.create({
                 type: 'payment_config',
                 upiId: 'ajithrajsree-1@oksbi',
-                amount: 500
+                amount: 500,
+                platinumAmount: 999
             });
         }
 
@@ -27,19 +28,21 @@ const getPaymentSettings = async (req, res) => {
 // @access  Private (Admin)
 const updatePaymentSettings = async (req, res) => {
     try {
-        const { upiId, amount } = req.body;
+        const { upiId, amount, platinumAmount } = req.body;
 
         let settings = await Settings.findOne({ type: 'payment_config' });
 
         if (settings) {
             settings.upiId = upiId || settings.upiId;
             settings.amount = amount || settings.amount;
+            if (platinumAmount) settings.platinumAmount = platinumAmount;
             await settings.save();
         } else {
             settings = await Settings.create({
                 type: 'payment_config',
                 upiId: upiId || 'ajithrajsree-1@oksbi',
-                amount: amount || 500
+                amount: amount || 500,
+                platinumAmount: platinumAmount || 999
             });
         }
 
