@@ -54,6 +54,18 @@ const gymSchema = new mongoose.Schema(
             required: true,
             default: 100, // Per session payout amount in INR
         },
+        totalSquareFeet: {
+            type: Number,
+            default: 0,
+        },
+        totalEquipments: {
+            type: Number,
+            default: 0,
+        },
+        totalTrainers: {
+            type: Number,
+            default: 0,
+        },
         qrCodeToken: {
             type: String,
             required: true,

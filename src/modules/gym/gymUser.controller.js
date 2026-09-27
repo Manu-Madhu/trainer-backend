@@ -83,6 +83,15 @@ const getNearbyGyms = async (req, res) => {
             return obj;
         });
 
+        // Prioritize closest gyms first
+        if (longitude && latitude) {
+            enrichedGyms.sort((a, b) => {
+                const dA = a.distanceKm !== undefined ? Number(a.distanceKm) : 999999;
+                const dB = b.distanceKm !== undefined ? Number(b.distanceKm) : 999999;
+                return dA - dB;
+            });
+        }
+
         res.json({
             success: true,
             count: enrichedGyms.length,
